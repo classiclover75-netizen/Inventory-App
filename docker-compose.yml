@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  inventory-app:
+    build: .
+    container_name: dynamic-inventory-app
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

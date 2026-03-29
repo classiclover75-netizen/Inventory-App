@@ -1,0 +1,53 @@
+export type ColumnType = 
+  | 'text' 
+  | 'number' 
+  | 'date' 
+  | 'dropdown' 
+  | 'multi_select' 
+  | 'checkbox' 
+  | 'image' 
+  | 'file' 
+  | 'formula' 
+  | 'relation' 
+  | 'multi_text' 
+  | 'text_with_copy_button' 
+  | 'system_serial';
+
+export interface Column {
+  key: string;
+  name: string;
+  type: ColumnType;
+  locked?: boolean;
+  movable?: boolean;
+  copyPerItem?: boolean;
+  multiInput?: boolean;
+  magicPasteDisabled?: boolean;
+  sortEnabled?: boolean;
+  sortDirection?: "asc" | "desc";
+  sortLocked?: boolean;
+  sortPriority?: number;
+  width?: number;
+  resizeLocked?: boolean;
+}
+
+export interface PageConfig {
+  rowReorderEnabled: boolean;
+  hoverPreviewEnabled?: boolean;
+  columns: Column[];
+  secondarySearchPage?: string;
+  searchBarOrder?: ('primary' | 'secondary')[];
+  rowHeight?: number;
+  independentSearchBars?: boolean;
+}
+
+export interface RowData {
+  id: string;
+  [key: string]: any;
+}
+
+export interface AppState {
+  pages: string[];
+  activePage: string;
+  pageConfigs: Record<string, PageConfig>;
+  pageRows: Record<string, RowData[]>;
+}
