@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings, Plus, X, Edit, Trash2, Copy, Image as ImageIcon, RefreshCw, GripVertical, ArrowUp, ArrowDown, Lock, Unlock } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -28,201 +28,6 @@ const initialConfig: PageConfig = {
   ]
 };
 
-const highlightText = (txt: any, tokens: string[]) => {
-  if (!tokens.length || !txt) return String(txt || '');
-  const safe = String(txt);
-  const escaped = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const regex = new RegExp('(' + escaped.join('|') + ')', 'gi');
-  const parts = safe.split(regex);
-  return parts.map((part, i) => 
-    regex.test(part) ? <span key={i} className="bg-yellow-300 text-black font-bold rounded-sm px-[1px]">{part}</span> : part
-  );
-};
-
-const MemoizedTableRow = React.memo(({
-  row,
-  rowIndex,
-  config,
-  isSecondary,
-  tokens,
-  isSelected,
-  rowActivePopupId,
-  rowActiveAnchor,
-  handleHoverChange,
-  toggleRowSelection,
-  setHoveredImage,
-  setPreviewContext,
-  toggleModal,
-  handleClosePopup,
-  setActivePopupId,
-  setActiveAnchor,
-  setEditingRowId,
-  handleDuplicateRow,
-  setRowToDelete
-}: any) => {
-  return (
-    <Draggable draggableId={`${isSecondary ? 'sec-' : ''}${row.id}`} index={rowIndex} isDragDisabled={isSecondary || !config.rowReorderEnabled || tokens.length > 0}>
-      {(provided, snapshot) => (
-        <tr 
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          data-row-id={row.id}
-          className={`${!isSecondary && isSelected ? 'bg-[#e8f0fe]' : ''} ${snapshot.isDragging ? 'bg-[#e8f0fe] shadow-xl table' : ''}`}
-          style={{
-            ...provided.draggableProps.style,
-            ...(snapshot.isDragging && { display: 'table', tableLayout: 'fixed' }),
-            height: `${config.rowHeight || 100}px`
-          }}
-        >
-          {!isSecondary && config.rowReorderEnabled && (
-            <td 
-              data-col-key="reorder"
-              className="text-center p-1.5 border-r border-b border-[#e0e0e0]"
-              onMouseEnter={() => handleHoverChange(row.id, 'reorder')}
-              onMouseLeave={() => handleHoverChange(null, null)}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-700">
-                  <GripVertical size={16} />
-                </div>
-                <input 
-                  type="checkbox" 
-                  className="cursor-pointer"
-                  checked={isSelected}
-                  onChange={(e) => toggleRowSelection(row.id, e.target.checked)}
-                />
-              </div>
-            </td>
-          )}
-          {config.columns.map((col: any, colIndex: number) => {
-            const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
-            
-            const commonProps = {
-              'data-col-key': col.key,
-              onMouseEnter: () => handleHoverChange(row.id, col.key),
-              onMouseLeave: () => handleHoverChange(null, null),
-              style: widthStyle
-            };
-
-            if (col.key === 'sr') {
-              const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
-              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className="font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] overflow-hidden">{rowIndex + 1}</td>;
-            }
-            
-            const rawVal = row[col.key];
-            
-            if (col.type === 'image') {
-              const imgData = typeof rawVal === 'object' && rawVal !== null ? rawVal.data : rawVal;
-              const isImg = typeof imgData === 'string' && (imgData.startsWith('data:image') || /^https?:\/\//i.test(imgData));
-              return (
-                <td 
-                  key={col.key} 
-                  {...commonProps} 
-                  className="text-center p-0 border-r border-b border-[#e0e0e0] bg-white overflow-hidden"
-                  style={{...commonProps.style, height: `${config.rowHeight || 100}px`}}
-                  onMouseMove={(e) => {
-                    if (isImg && config.hoverPreviewEnabled) {
-                      setHoveredImage({ url: imgData, x: e.clientX, y: e.clientY });
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    handleHoverChange(null, null);
-                    setHoveredImage(null);
-                  }}
-                >
-                  {isImg ? (
-                    <img 
-                      src={imgData} 
-                      alt="img" 
-                      loading="lazy"
-                      className="w-full h-full object-contain cursor-pointer block"
-                      onClick={() => {
-                        setPreviewContext({ rowId: row.id, imageKey: col.key });
-                        toggleModal('imagePreview', true);
-                      }}
-                    />
-                  ) : (
-                    <span className="w-full h-full inline-flex items-center justify-center text-[#9e9e9e] text-2xl bg-[#fafafa]">📷</span>
-                  )}
-                </td>
-              );
-            }
-
-            if (col.type === 'text_with_copy_button') {
-              const items = Array.isArray(rawVal) ? rawVal.map(v => String(v || '').trim()).filter(Boolean) : (String(rawVal || '').trim() ? [String(rawVal).trim()] : []);
-              const isCellActive = rowActivePopupId?.startsWith(`${row.id}-${col.key}`);
-              const cellClass = isCellActive 
-                ? 'bg-[#fff3cd] shadow-[inset_0_0_0_2px_#fac800] relative z-10 transition-all'
-                : '';
-              
-              return (
-                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden ${cellClass}`}>
-                  {items.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      {items.map((item, i) => {
-                        const itemId = `${row.id}-${col.key}-${i}`;
-                        return (
-                          <div key={i} className="flex items-center justify-between gap-1.5 border border-[#d7e3f6] bg-[#f9fcff] rounded px-1.5 py-0.5 min-h-[25px]">
-                            <span>{highlightText(item, tokens)}</span>
-                            <button 
-                              className="border-0 rounded bg-[#2b579a] text-white px-1.5 py-0.5 text-[11px] font-bold cursor-pointer shrink-0"
-                              onClick={(e) => {
-                                const target = e.currentTarget;
-                                navigator.clipboard.writeText(item).then(() => {
-                                  setActivePopupId(itemId);
-                                  setActiveAnchor(target);
-                                });
-                              }}
-                            >
-                              Copy
-                            </button>
-                            <CopyPopupNotification 
-                              text={item} 
-                              columnName={col.name} 
-                              columnNumber={colIndex + 1} 
-                              isActive={rowActivePopupId === itemId}
-                              anchorElement={rowActiveAnchor}
-                              onClose={handleClosePopup}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </td>
-              );
-            }
-
-            if (Array.isArray(rawVal)) {
-              return (
-                <td key={col.key} {...commonProps} className="p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden">
-                  {rawVal.map((v, i) => <React.Fragment key={i}>{highlightText(v, tokens)}<br/></React.Fragment>)}
-                </td>
-              );
-            }
-
-            return (
-              <td key={col.key} {...commonProps} className="p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden">
-                {highlightText(rawVal, tokens)}
-              </td>
-            );
-          })}
-          {!isSecondary && (
-            <td 
-              data-col-key="action"
-              className="w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden"
-              onMouseEnter={() => handleHoverChange(row.id, 'action')}
-              onMouseLeave={() => handleHoverChange(null, null)}
-            >
-              <button className="border-0 bg-transparent cursor-pointer text-[15px] mr-1" onClick={() => { setEditingRowId(row.id); toggleModal('addRow', true); }}>✏️</button>
-            </td>
-          )}
-        </tr>
-      )}
-    </Draggable>
-  );
-});
-
 function AppContent() {
   const [state, setState] = useState<AppState>({
     pages: [],
@@ -231,31 +36,10 @@ function AppContent() {
     pageRows: {}
   });
 
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
+  const [hoveredColKey, setHoveredColKey] = useState<string | null>(null);
   const [activePopupId, setActivePopupId] = useState<string | null>(null);
   const [activeAnchor, setActiveAnchor] = useState<HTMLElement | null>(null);
-
-  const tableRef = useRef<HTMLTableElement>(null);
-  const styleRef = useRef<HTMLStyleElement>(null);
-
-  const handleHoverChange = useCallback((rowId: string | null, colKey: string | null) => {
-    if (tableRef.current) {
-      tableRef.current.style.setProperty('--hovered-row-id', rowId ? `"${rowId}"` : 'null');
-      tableRef.current.style.setProperty('--hovered-col-key', colKey ? `"${colKey}"` : 'null');
-    }
-    if (styleRef.current) {
-      if (rowId || colKey) {
-        styleRef.current.textContent = `
-          ${rowId ? `.data-table tr[data-row-id="${rowId}"] td { background-color: #e8f0fe; }` : ''}
-          ${colKey && colKey !== 'sr' ? `.data-table td[data-col-key="${colKey}"] { background-color: #f0f7ff; }` : ''}
-          ${colKey ? `.data-table th[data-col-key="${colKey}"] { background-color: #fce7f3; }` : ''}
-          ${rowId && colKey && colKey !== 'sr' ? `.data-table td[data-row-id="${rowId}"][data-col-key="${colKey}"] { background-color: #d2e3fc; outline: 3px solid #2b579a; z-index: 10; position: relative; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); }` : ''}
-          ${rowId ? `.data-table tr[data-row-id="${rowId}"] td[data-col-key="sr"] { background-color: #fce7f3; }` : ''}
-        `;
-      } else {
-        styleRef.current.textContent = '';
-      }
-    }
-  }, []);
 
   const [pageSearchQueries, setPageSearchQueries] = useState<Record<string, string>>({});
   const [showUndoToast, setShowUndoToast] = useState(false);
@@ -263,23 +47,6 @@ function AppContent() {
   const [lastSecondarySearchQuery, setLastSecondarySearchQuery] = useState<string>('');
   const currentSearch = pageSearchQueries[state.activePage] || '';
   const [secondarySearchQuery, setSecondarySearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState(currentSearch);
-  const [debouncedSecondarySearch, setDebouncedSecondarySearch] = useState(secondarySearchQuery);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(currentSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [currentSearch]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSecondarySearch(secondarySearchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [secondarySearchQuery]);
-
   const [activeSearchView, setActiveSearchView] = useState<'primary' | 'secondary'>('primary');
   const [showTopSettings, setShowTopSettings] = useState(false);
   const [isDupModalOpen, setIsDupModalOpen] = useState(false);
@@ -418,10 +185,11 @@ function AppContent() {
   });
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [editingColumn, setEditingColumn] = useState<Column | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean, title?: string, message?: string, confirmLabel?: string, onConfirm: () => void } | null>(null);
   const [rowToDelete, setRowToDelete] = useState<string | null>(null);
-  const [previewContext, setPreviewContext] = useState<{ rowId: string; imageKey: string } | null>(null);
+  const [previewContext, setPreviewContext] = useState<{ rowId: string; imageKey: string; pageName: string } | null>(null);
   const [returnToSettings, setReturnToSettings] = useState(false);
   const [returnToImagePreview, setReturnToImagePreview] = useState(false);
   const [hoveredImage, setHoveredImage] = useState<{ url: string; x: number; y: number } | null>(null);
@@ -504,9 +272,9 @@ function AppContent() {
     });
   };
 
-  const toggleModal = useCallback((modal: keyof typeof modals, value: boolean) => {
+  const toggleModal = (modal: keyof typeof modals, value: boolean) => {
     setModals(prev => ({ ...prev, [modal]: value }));
-  }, []);
+  };
 
   const closeAllModals = () => {
     setModals({
@@ -523,6 +291,7 @@ function AppContent() {
       excelExport: false
     });
     setEditingRowId(null);
+    setEditingPageName(null);
     setEditingColumn(null);
     setPreviewContext(null);
     setReturnToSettings(false);
@@ -531,15 +300,6 @@ function AppContent() {
 
   const activeConfig = state.pageConfigs[state.activePage] || initialConfig;
   const activeRows = state.pageRows[state.activePage] || [];
-
-  const toggleRowSelection = useCallback((id: string, isSelected: boolean) => {
-    setSelectedRowIds(prev => {
-      const newSet = new Set(prev);
-      if (isSelected) newSet.add(id);
-      else newSet.delete(id);
-      return newSet;
-    });
-  }, []);
 
   const handleCreatePage = (name: string, columns: Column[]) => {
     setState(prev => ({
@@ -691,9 +451,10 @@ function AppContent() {
     });
   };
 
-  const handleSaveRows = (newRows: RowData[]) => {
+  const handleSaveRows = (newRows: RowData[], pageName?: string) => {
+    const targetPage = pageName || state.activePage;
     setState(prev => {
-      const currentRows = [...(prev.pageRows[state.activePage] || [])];
+      const currentRows = [...(prev.pageRows[targetPage] || [])];
       
       if (editingRowId) {
         const idx = currentRows.findIndex(r => r.id === editingRowId);
@@ -707,7 +468,7 @@ function AppContent() {
         ...prev,
         pageRows: {
           ...prev.pageRows,
-          [state.activePage]: currentRows
+          [targetPage]: currentRows
         }
       };
     });
@@ -723,12 +484,13 @@ function AppContent() {
     toast(editingRowId ? 'Row updated successfully' : `${newRows.length} row(s) added successfully`);
   };
 
-  const handleDeleteRow = (rowId: string) => {
+  const handleDeleteRow = (rowId: string, pageName?: string) => {
+    const targetPage = pageName || state.activePage;
     setState(prev => ({
       ...prev,
       pageRows: {
         ...prev.pageRows,
-        [state.activePage]: prev.pageRows[state.activePage].filter(r => r.id !== rowId)
+        [targetPage]: prev.pageRows[targetPage].filter(r => r.id !== rowId)
       }
     }));
     setSelectedRowIds(prev => {
@@ -746,38 +508,39 @@ function AppContent() {
     toast('Row deleted');
   };
 
-  const handleReplaceImage = (newImage: string) => {
+  const handleReplaceImage = (newImage: any, pageName?: string) => {
     if (!previewContext) return;
+    const targetPage = pageName || previewContext.sourcePage;
     setState(prev => {
-      const currentRows = [...(prev.pageRows[state.activePage] || [])];
+      const currentRows = [...(prev.pageRows[targetPage] || [])];
       const idx = currentRows.findIndex(r => r.id === previewContext.rowId);
       if (idx >= 0) {
-        currentRows[idx] = { ...currentRows[idx], [previewContext.imageKey]: newImage };
+        currentRows[idx] = { ...currentRows[idx], [previewContext.imageKey]: newImage.data || newImage };
       }
       return {
         ...prev,
         pageRows: {
           ...prev.pageRows,
-          [state.activePage]: currentRows
+          [targetPage]: currentRows
         }
       };
     });
     toast('Image replaced successfully');
   };
 
-  const handleDeleteImage = () => {
-    if (!previewContext) return;
+  const handleDeleteImage = (rowId: string, imageKey: string, pageName?: string) => {
+    const targetPage = pageName || previewContext?.sourcePage || state.activePage;
     setState(prev => {
-      const currentRows = [...(prev.pageRows[state.activePage] || [])];
-      const idx = currentRows.findIndex(r => r.id === previewContext.rowId);
+      const currentRows = [...(prev.pageRows[targetPage] || [])];
+      const idx = currentRows.findIndex(r => r.id === rowId);
       if (idx >= 0) {
-        currentRows[idx] = { ...currentRows[idx], [previewContext.imageKey]: '' };
+        currentRows[idx] = { ...currentRows[idx], [imageKey]: '' };
       }
       return {
         ...prev,
         pageRows: {
           ...prev.pageRows,
-          [state.activePage]: currentRows
+          [targetPage]: currentRows
         }
       };
     });
@@ -832,8 +595,8 @@ function AppContent() {
 
   const filteredRows = useMemo(() => {
     let rows = activeRows;
-    if (debouncedSearch.trim()) {
-      const tokens = debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (currentSearch.trim()) {
+      const tokens = currentSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
       rows = rows.filter(row => {
         const searchableValues = activeConfig.columns.map(col => {
           if (col.key === 'sr' || col.type === 'image' || col.type === 'file') return '';
@@ -847,7 +610,7 @@ function AppContent() {
       });
     }
     return sortRows(rows, activeConfig.columns);
-  }, [activeRows, debouncedSearch, activeConfig.columns]);
+  }, [activeRows, currentSearch, activeConfig.columns]);
 
   const secondaryFilteredRows = useMemo(() => {
     if (!activeConfig.secondarySearchPage) return [];
@@ -856,8 +619,8 @@ function AppContent() {
     if (!secConfig) return [];
     
     let rows = secRows;
-    if (debouncedSecondarySearch.trim()) {
-      const tokens = debouncedSecondarySearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (secondarySearchQuery.trim()) {
+      const tokens = secondarySearchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
       rows = rows.filter(row => {
         const searchableValues = secConfig.columns.map(col => {
           if (col.key === 'sr' || col.type === 'image' || col.type === 'file') return '';
@@ -871,24 +634,30 @@ function AppContent() {
       });
     }
     return sortRows(rows, secConfig.columns);
-  }, [state.pageRows, state.pageConfigs, activeConfig.secondarySearchPage, debouncedSecondarySearch]);
+  }, [state.pageRows, state.pageConfigs, activeConfig.secondarySearchPage, secondarySearchQuery]);
 
-  const searchTokens = useMemo(() => debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean), [debouncedSearch]);
-  const secondarySearchTokens = useMemo(() => debouncedSecondarySearch.trim().toLowerCase().split(/\s+/).filter(Boolean), [debouncedSecondarySearch]);
+  const highlightText = (txt: any, tokens: string[]) => {
+    if (!tokens.length || !txt) return String(txt || '');
+    const safe = String(txt);
+    const escaped = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp('(' + escaped.join('|') + ')', 'gi');
+    const parts = safe.split(regex);
+    return parts.map((part, i) => 
+      regex.test(part) ? <span key={i} className="bg-yellow-300 text-black font-bold rounded-sm px-[1px]">{part}</span> : part
+    );
+  };
+
+  const searchTokens = currentSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const secondarySearchTokens = secondarySearchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
   const renderTable = (config: PageConfig, rows: RowData[], tokens: string[], isSecondary: boolean) => (
     <div className="flex-1 min-h-0 overflow-auto border-none rounded-none m-0 p-0">
       <DragDropContext onDragEnd={isSecondary ? () => {} : handleDragEnd}>
-        <table ref={tableRef} className="data-table w-full border-collapse table-fixed text-[13px]">
+        <table className="w-full border-collapse table-fixed text-[13px]">
           <thead>
             <tr>
               {!isSecondary && config.rowReorderEnabled && (
-                <th 
-                  data-col-key="reorder"
-                  className="sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] bg-[#f3f3f3]"
-                  onMouseEnter={() => handleHoverChange(null, 'reorder')}
-                  onMouseLeave={() => handleHoverChange(null, null)}
-                >
+                <th className={`sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] ${hoveredColKey === 'reorder' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>
                   <input 
                     type="checkbox" 
                     className="cursor-pointer"
@@ -910,11 +679,8 @@ function AppContent() {
                 return (
                   <th 
                     key={col.key} 
-                    data-col-key={col.key}
-                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')}`}
+                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} ${hoveredColKey === col.key ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}
                     style={widthStyle}
-                    onMouseEnter={() => handleHoverChange(null, col.key)}
-                    onMouseLeave={() => handleHoverChange(null, null)}
                   >
                     <div className="flex items-center gap-1">
                       {i + 1}. {col.name} {col.sortPriority ? <span className="text-[10px] font-bold text-gray-500">(P{col.sortPriority})</span> : ''} {col.locked && '🔒'}
@@ -928,16 +694,7 @@ function AppContent() {
                   </th>
                 );
               })}
-              {!isSecondary && (
-                <th 
-                  data-col-key="action"
-                  className="sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] bg-[#f3f3f3]"
-                  onMouseEnter={() => handleHoverChange(null, 'action')}
-                  onMouseLeave={() => handleHoverChange(null, null)}
-                >
-                  Act 🔒
-                </th>
-              )}
+              <th className={`sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] ${hoveredColKey === 'action' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>Act 🔒</th>
             </tr>
           </thead>
           <Droppable droppableId={`droppable-tbody-${isSecondary ? 'secondary' : 'primary'}`}>
@@ -951,26 +708,178 @@ function AppContent() {
                   </tr>
                 ) : (
                   rows.map((row, rowIndex) => (
-                    <MemoizedTableRow
-                      key={row.id}
-                      row={row}
-                      rowIndex={rowIndex}
-                      config={config}
-                      isSecondary={isSecondary}
-                      tokens={tokens}
-                      isSelected={selectedRowIds.has(row.id)}
-                      rowActivePopupId={activePopupId?.startsWith(`${row.id}-`) ? activePopupId : null}
-                      rowActiveAnchor={activePopupId?.startsWith(`${row.id}-`) ? activeAnchor : null}
-                      handleHoverChange={handleHoverChange}
-                      toggleRowSelection={toggleRowSelection}
-                      setHoveredImage={setHoveredImage}
-                      setPreviewContext={setPreviewContext}
-                      toggleModal={toggleModal}
-                      handleClosePopup={handleClosePopup}
-                      setActivePopupId={setActivePopupId}
-                      setActiveAnchor={setActiveAnchor}
-                      setEditingRowId={setEditingRowId}
-                    />
+                    // @ts-ignore
+                    <Draggable key={row.id} draggableId={`${isSecondary ? 'sec-' : ''}${row.id}`} index={rowIndex} isDragDisabled={isSecondary || !config.rowReorderEnabled || tokens.length > 0}>
+                      {(provided, snapshot) => (
+                        <tr 
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`${!isSecondary && selectedRowIds.has(row.id) ? 'bg-[#e8f0fe]' : ''} ${snapshot.isDragging ? 'bg-[#e8f0fe] shadow-xl table' : ''}`}
+                          style={{
+                            ...provided.draggableProps.style,
+                            ...(snapshot.isDragging && { display: 'table', tableLayout: 'fixed' }),
+                            height: `${config.rowHeight || 100}px`
+                          }}
+                        >
+                          {!isSecondary && config.rowReorderEnabled && (
+                            <td 
+                              className={`text-center p-1.5 border-r border-b border-[#e0e0e0] ${(hoveredRowId === row.id && hoveredColKey === 'reorder') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === 'reorder' ? 'bg-[#f0f7ff]' : ''))}`}
+                              onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('reorder'); }}
+                              onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+                            >
+                              <div className="flex items-center justify-center gap-2">
+                                <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-700">
+                                  <GripVertical size={16} />
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  className="cursor-pointer"
+                                  checked={selectedRowIds.has(row.id)}
+                                  onChange={(e) => {
+                                    const newSet = new Set(selectedRowIds);
+                                    if (e.target.checked) newSet.add(row.id);
+                                    else newSet.delete(row.id);
+                                    setSelectedRowIds(newSet);
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          )}
+                          {config.columns.map((col, colIndex) => {
+                            const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
+                            const isExactHover = hoveredRowId === row.id && hoveredColKey === col.key;
+                            const hoverClass = isExactHover 
+                              ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' 
+                              : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === col.key ? 'bg-[#f0f7ff]' : ''));
+                            
+                            const commonProps = {
+                              onMouseEnter: () => { setHoveredRowId(row.id); setHoveredColKey(col.key); },
+                              onMouseLeave: () => { setHoveredRowId(null); setHoveredColKey(null); },
+                              style: widthStyle
+                            };
+
+                            if (col.key === 'sr') {
+                              const srBgClass = hoveredRowId === row.id ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]';
+                              const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
+                              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] ${srBgClass} overflow-hidden`}>{rowIndex + 1}</td>;
+                            }
+                            
+                            const rawVal = row[col.key];
+                            
+                            if (col.type === 'image') {
+                              const imgData = typeof rawVal === 'object' && rawVal !== null ? rawVal.data : rawVal;
+                              const isImg = typeof imgData === 'string' && (imgData.startsWith('data:image') || /^https?:\/\//i.test(imgData));
+                              return (
+                                <td 
+                                  key={col.key} 
+                                  {...commonProps} 
+                                  className={`text-center p-0 border-r border-b border-[#e0e0e0] ${hoverClass} bg-white overflow-hidden`}
+                                  style={{...commonProps.style, height: `${config.rowHeight || 100}px`}}
+                                  onMouseMove={(e) => {
+                                    if (isImg && config.hoverPreviewEnabled) {
+                                      setHoveredImage({ url: imgData, x: e.clientX, y: e.clientY });
+                                    }
+                                  }}
+                                  onMouseLeave={() => {
+                                    setHoveredRowId(null);
+                                    setHoveredColKey(null);
+                                    setHoveredImage(null);
+                                  }}
+                                >
+                                  {isImg ? (
+                                    <img 
+                                      src={imgData} 
+                                      alt="img" 
+                                      className="w-full h-full object-contain cursor-pointer block"
+                                      onClick={() => {
+                                        setPreviewContext({ 
+                                          rowId: row.id, 
+                                          imageKey: col.key, 
+                                          pageName: isSecondary ? activeConfig.secondarySearchPage! : state.activePage 
+                                        });
+                                        toggleModal('imagePreview', true);
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="w-full h-full inline-flex items-center justify-center text-[#9e9e9e] text-2xl bg-[#fafafa]">📷</span>
+                                  )}
+                                </td>
+                              );
+                            }
+
+                            if (col.type === 'text_with_copy_button') {
+                              const items = Array.isArray(rawVal) ? rawVal.map(v => String(v || '').trim()).filter(Boolean) : (String(rawVal || '').trim() ? [String(rawVal).trim()] : []);
+                              const isCellActive = activePopupId?.startsWith(`${row.id}-${col.key}`);
+                              const cellClass = isCellActive 
+                                ? 'bg-[#fff3cd] shadow-[inset_0_0_0_2px_#fac800] relative z-10 transition-all'
+                                : hoverClass;
+                              
+                              return (
+                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${cellClass} overflow-hidden`}>
+                                  {items.length > 0 && (
+                                    <div className="flex flex-col gap-1">
+                                      {items.map((item, i) => {
+                                        const itemId = `${row.id}-${col.key}-${i}`;
+                                        return (
+                                          <div key={i} className="flex items-center justify-between gap-1.5 border border-[#d7e3f6] bg-[#f9fcff] rounded px-1.5 py-0.5 min-h-[25px]">
+                                            <span>{highlightText(item, tokens)}</span>
+                                            <button 
+                                              className="border-0 rounded bg-[#2b579a] text-white px-1.5 py-0.5 text-[11px] font-bold cursor-pointer shrink-0"
+                                              onClick={(e) => {
+                                                const target = e.currentTarget;
+                                                navigator.clipboard.writeText(item).then(() => {
+                                                  setActivePopupId(itemId);
+                                                  setActiveAnchor(target);
+                                                });
+                                              }}
+                                            >
+                                              Copy
+                                            </button>
+                                            <CopyPopupNotification 
+                                              text={item} 
+                                              columnName={col.name} 
+                                              columnNumber={colIndex + 1} 
+                                              isActive={activePopupId === itemId}
+                                              anchorElement={activeAnchor}
+                                              onClose={handleClosePopup}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            }
+
+                            if (Array.isArray(rawVal)) {
+                              return (
+                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+                                  {rawVal.map((v, i) => <React.Fragment key={i}>{highlightText(v, tokens)}<br/></React.Fragment>)}
+                                </td>
+                              );
+                            }
+
+                            return (
+                              <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+                                {highlightText(rawVal, tokens)}
+                              </td>
+                            );
+                          })}
+                          <td 
+                            className={`w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden ${(hoveredRowId === row.id && hoveredColKey === 'action') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === 'action' ? 'bg-[#f0f7ff]' : ''))}`}
+                            onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('action'); }}
+                            onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+                          >
+                            <button className="border-0 bg-transparent cursor-pointer text-[15px] mr-1" onClick={() => { 
+                              setEditingRowId(row.id); 
+                              setEditingPageName(isSecondary ? activeConfig.secondarySearchPage! : state.activePage);
+                              toggleModal('addRow', true); 
+                            }}>✏️</button>
+                          </td>
+                        </tr>
+                      )}
+                    </Draggable>
                   ))
                 )}
                 {provided.placeholder}
@@ -984,7 +893,6 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen max-w-full mx-auto gap-2 p-2 bg-[#f4f7f6] text-[#333] font-sans box-border">
-      <style ref={styleRef} />
       <div className="flex justify-between items-center bg-white border border-[#d8d8d8] rounded-md p-2 px-2.5">
         <div className="text-[19px] font-bold text-[#2c3e50]">
           📦 Dynamic Inventory Platform <span className="text-[#217346] text-sm">(Pro Classic Visual)</span>
@@ -1136,7 +1044,7 @@ function AppContent() {
                   />
                   {!secondarySearchQuery && (
                     <div className="absolute inset-y-0 left-0 flex items-center pl-[10px] pointer-events-none text-gray-400 text-sm whitespace-nowrap">
-                      🔍 Search Data For "<strong>{activeConfig.secondarySearchPage}</strong>"
+                      🔍 Search Data For "<strong>{activeConfig.secondarySearchPage}</strong>" (Secondary Search)
                     </div>
                   )}
                 </div>
@@ -1211,22 +1119,22 @@ function AppContent() {
           toggleModal('activePageSettings', true);
         } : undefined)}
         backText={returnToImagePreview ? "Back to Image Preview" : "Back to Active Page Settings"}
-        onSave={handleSaveRows} 
+        onSave={(rows) => handleSaveRows(rows, previewContext?.pageName || editingPageName || undefined)} 
         onDelete={(id) => {
           setConfirmationModal({
             isOpen: true,
             title: "Confirm Deletion",
             message: "Are you sure you want to delete this row? This action cannot be undone.",
             onConfirm: () => {
-              handleDeleteRow(id);
+              handleDeleteRow(id, previewContext?.pageName || editingPageName || undefined);
               closeAllModals();
             }
           });
         }}
-        columns={activeConfig.columns} 
-        editingRow={editingRowId ? activeRows.find(r => r.id === editingRowId) || null : null} 
-        editingRowIndex={editingRowId ? activeRows.findIndex(r => r.id === editingRowId) : -1}
-        activePage={state.activePage} 
+        columns={previewContext ? state.pageConfigs[previewContext.pageName].columns : (editingPageName ? state.pageConfigs[editingPageName].columns : activeConfig.columns)} 
+        editingRow={editingRowId ? (state.pageRows[previewContext?.pageName || editingPageName || state.activePage] || []).find(r => r.id === editingRowId) || null : null} 
+        editingRowIndex={editingRowId ? (state.pageRows[previewContext?.pageName || editingPageName || state.activePage] || []).findIndex(r => r.id === editingRowId) : -1}
+        activePage={previewContext?.pageName || editingPageName || state.activePage} 
         onToggleMagicPasteColumn={handleToggleMagicPasteColumn}
         setConfirmationModal={setConfirmationModal}
       />
@@ -1322,22 +1230,24 @@ function AppContent() {
       <ImagePreviewModal 
         isOpen={modals.imagePreview} 
         onClose={closeAllModals} 
-        row={previewContext ? activeRows.find(r => r.id === previewContext.rowId) || null : null} 
+        row={previewContext ? (state.pageRows[previewContext.pageName] || []).find(r => r.id === previewContext.rowId) || null : null} 
         imageColKey={previewContext?.imageKey || ''} 
-        columns={activeConfig.columns} 
-        rowIndex={previewContext ? activeRows.findIndex(r => r.id === previewContext.rowId) : -1} 
+        columns={previewContext ? state.pageConfigs[previewContext.pageName].columns : activeConfig.columns} 
+        rowIndex={previewContext ? (state.pageRows[previewContext.pageName] || []).findIndex(r => r.id === previewContext.rowId) : -1} 
         onEditRow={() => { 
           setReturnToImagePreview(true);
           toggleModal('imagePreview', false); 
           setEditingRowId(previewContext?.rowId || null); 
+          setEditingPageName(previewContext?.pageName || null);
           toggleModal('addRow', true); 
         }} 
-        onReplaceImage={handleReplaceImage} 
-        onDeleteImage={handleDeleteImage}
+        onReplaceImage={(newImage) => handleReplaceImage(newImage, previewContext?.pageName)}
+        onDeleteImage={(rowId, imageKey) => handleDeleteImage(rowId, imageKey, previewContext?.pageName)}
         activePopupId={activePopupId}
         setActivePopupId={setActivePopupId}
         activeAnchor={activeAnchor}
         setActiveAnchor={setActiveAnchor}
+        pageName={previewContext?.pageName || state.activePage}
       />
 
       <ReorderPagesModal 

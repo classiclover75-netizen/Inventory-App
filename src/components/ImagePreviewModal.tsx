@@ -19,7 +19,8 @@ export const ImagePreviewModal = ({
   activePopupId,
   setActivePopupId,
   activeAnchor,
-  setActiveAnchor
+  setActiveAnchor,
+  pageName
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -29,18 +30,24 @@ export const ImagePreviewModal = ({
   columns: Column[];
   rowIndex: number;
   onEditRow: () => void;
-  onReplaceImage: (newImage: string) => void;
-  onDeleteImage: () => void;
+  onReplaceImage: (newImage: any, pageName: string) => void;
+  onDeleteImage: (rowId: string, imageKey: string, pageName: string) => void;
   activePopupId: string | null;
   setActivePopupId: (id: string | null) => void;
   activeAnchor: HTMLElement | null;
   setActiveAnchor: (el: HTMLElement | null) => void;
+  pageName: string;
 }) => {
   const [replaceMode, setReplaceMode] = useState<'url' | 'file'>('url');
   const [replaceUrl, setReplaceUrl] = useState('');
   const [showReplacePanel, setShowReplacePanel] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const { toast } = useToast();
+
+  // ... (rest of the component)
+  // Inside the component, update the calls to onReplaceImage and onDeleteImage:
+  // onReplaceImage(newImage, sourcePage)
+  // onDeleteImage(row!.id, imageColKey, sourcePage)
 
   // Zoom and Pan State
   const [scale, setScale] = useState(1);
@@ -76,7 +83,7 @@ export const ImagePreviewModal = ({
         data: replaceUrl.trim(),
         rawSize: dummySize,
         compressedSize: dummySize
-      } as any);
+      } as any, pageName);
       setShowReplacePanel(false);
       setReplaceUrl('');
     } else {
@@ -94,7 +101,7 @@ export const ImagePreviewModal = ({
           data: dataUrl,
           rawSize: rawSize,
           compressedSize: compressedSize
-        } as any);
+        } as any, pageName);
         setShowReplacePanel(false);
       };
       reader.readAsDataURL(file);
@@ -225,7 +232,7 @@ export const ImagePreviewModal = ({
                   <Button 
                     variant="red" 
                     onClick={() => {
-                      onDeleteImage();
+                      onDeleteImage(row!.id, imageColKey, pageName);
                       onClose();
                       setIsConfirmingDelete(false);
                     }}
