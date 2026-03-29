@@ -46,12 +46,9 @@ const MemoizedTableRow = React.memo(({
   isSecondary,
   tokens,
   isSelected,
-  isHoveredRow,
-  hoveredColKey,
   rowActivePopupId,
   rowActiveAnchor,
-  setHoveredRowId,
-  setHoveredColKey,
+  handleHoverChange,
   toggleRowSelection,
   setHoveredImage,
   setPreviewContext,
@@ -69,6 +66,7 @@ const MemoizedTableRow = React.memo(({
         <tr 
           ref={provided.innerRef}
           {...provided.draggableProps}
+          data-row-id={row.id}
           className={`${!isSecondary && isSelected ? 'bg-[#e8f0fe]' : ''} ${snapshot.isDragging ? 'bg-[#e8f0fe] shadow-xl table' : ''}`}
           style={{
             ...provided.draggableProps.style,
@@ -78,9 +76,10 @@ const MemoizedTableRow = React.memo(({
         >
           {!isSecondary && config.rowReorderEnabled && (
             <td 
-              className={`text-center p-1.5 border-r border-b border-[#e0e0e0] ${(isHoveredRow && hoveredColKey === 'reorder') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (isHoveredRow ? 'bg-[#e8f0fe]' : (hoveredColKey === 'reorder' ? 'bg-[#f0f7ff]' : ''))}`}
-              onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('reorder'); }}
-              onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+              data-col-key="reorder"
+              className="text-center p-1.5 border-r border-b border-[#e0e0e0]"
+              onMouseEnter={() => handleHoverChange(row.id, 'reorder')}
+              onMouseLeave={() => handleHoverChange(null, null)}
             >
               <div className="flex items-center justify-center gap-2">
                 <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-700">
@@ -97,21 +96,17 @@ const MemoizedTableRow = React.memo(({
           )}
           {config.columns.map((col: any, colIndex: number) => {
             const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
-            const isExactHover = isHoveredRow && hoveredColKey === col.key;
-            const hoverClass = isExactHover 
-              ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' 
-              : (isHoveredRow ? 'bg-[#e8f0fe]' : (hoveredColKey === col.key ? 'bg-[#f0f7ff]' : ''));
             
             const commonProps = {
-              onMouseEnter: () => { setHoveredRowId(row.id); setHoveredColKey(col.key); },
-              onMouseLeave: () => { setHoveredRowId(null); setHoveredColKey(null); },
+              'data-col-key': col.key,
+              onMouseEnter: () => handleHoverChange(row.id, col.key),
+              onMouseLeave: () => handleHoverChange(null, null),
               style: widthStyle
             };
 
             if (col.key === 'sr') {
-              const srBgClass = isHoveredRow ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]';
               const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
-              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] ${srBgClass} overflow-hidden`}>{rowIndex + 1}</td>;
+              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className="font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] overflow-hidden">{rowIndex + 1}</td>;
             }
             
             const rawVal = row[col.key];
@@ -123,7 +118,7 @@ const MemoizedTableRow = React.memo(({
                 <td 
                   key={col.key} 
                   {...commonProps} 
-                  className={`text-center p-0 border-r border-b border-[#e0e0e0] ${hoverClass} bg-white overflow-hidden`}
+                  className="text-center p-0 border-r border-b border-[#e0e0e0] bg-white overflow-hidden"
                   style={{...commonProps.style, height: `${config.rowHeight || 100}px`}}
                   onMouseMove={(e) => {
                     if (isImg && config.hoverPreviewEnabled) {
@@ -131,8 +126,7 @@ const MemoizedTableRow = React.memo(({
                     }
                   }}
                   onMouseLeave={() => {
-                    setHoveredRowId(null);
-                    setHoveredColKey(null);
+                    handleHoverChange(null, null);
                     setHoveredImage(null);
                   }}
                 >
@@ -159,10 +153,10 @@ const MemoizedTableRow = React.memo(({
               const isCellActive = rowActivePopupId?.startsWith(`${row.id}-${col.key}`);
               const cellClass = isCellActive 
                 ? 'bg-[#fff3cd] shadow-[inset_0_0_0_2px_#fac800] relative z-10 transition-all'
-                : hoverClass;
+                : '';
               
               return (
-                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${cellClass} overflow-hidden`}>
+                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden ${cellClass}`}>
                   {items.length > 0 && (
                     <div className="flex flex-col gap-1">
                       {items.map((item, i) => {
@@ -201,23 +195,24 @@ const MemoizedTableRow = React.memo(({
 
             if (Array.isArray(rawVal)) {
               return (
-                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+                <td key={col.key} {...commonProps} className="p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden">
                   {rawVal.map((v, i) => <React.Fragment key={i}>{highlightText(v, tokens)}<br/></React.Fragment>)}
                 </td>
               );
             }
 
             return (
-              <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+              <td key={col.key} {...commonProps} className="p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden">
                 {highlightText(rawVal, tokens)}
               </td>
             );
           })}
           {!isSecondary && (
             <td 
-              className={`w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden ${(isHoveredRow && hoveredColKey === 'action') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (isHoveredRow ? 'bg-[#e8f0fe]' : (hoveredColKey === 'action' ? 'bg-[#f0f7ff]' : ''))}`}
-              onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('action'); }}
-              onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+              data-col-key="action"
+              className="w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden"
+              onMouseEnter={() => handleHoverChange(row.id, 'action')}
+              onMouseLeave={() => handleHoverChange(null, null)}
             >
               <button className="border-0 bg-transparent cursor-pointer text-[15px] mr-1" onClick={() => { setEditingRowId(row.id); toggleModal('addRow', true); }}>✏️</button>
             </td>
@@ -236,10 +231,31 @@ function AppContent() {
     pageRows: {}
   });
 
-  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-  const [hoveredColKey, setHoveredColKey] = useState<string | null>(null);
   const [activePopupId, setActivePopupId] = useState<string | null>(null);
   const [activeAnchor, setActiveAnchor] = useState<HTMLElement | null>(null);
+
+  const tableRef = useRef<HTMLTableElement>(null);
+  const styleRef = useRef<HTMLStyleElement>(null);
+
+  const handleHoverChange = useCallback((rowId: string | null, colKey: string | null) => {
+    if (tableRef.current) {
+      tableRef.current.style.setProperty('--hovered-row-id', rowId ? `"${rowId}"` : 'null');
+      tableRef.current.style.setProperty('--hovered-col-key', colKey ? `"${colKey}"` : 'null');
+    }
+    if (styleRef.current) {
+      if (rowId || colKey) {
+        styleRef.current.textContent = `
+          ${rowId ? `.data-table tr[data-row-id="${rowId}"] td { background-color: #e8f0fe; }` : ''}
+          ${colKey && colKey !== 'sr' ? `.data-table td[data-col-key="${colKey}"] { background-color: #f0f7ff; }` : ''}
+          ${colKey ? `.data-table th[data-col-key="${colKey}"] { background-color: #fce7f3; }` : ''}
+          ${rowId && colKey && colKey !== 'sr' ? `.data-table td[data-row-id="${rowId}"][data-col-key="${colKey}"] { background-color: #d2e3fc; outline: 3px solid #2b579a; z-index: 10; position: relative; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); }` : ''}
+          ${rowId ? `.data-table tr[data-row-id="${rowId}"] td[data-col-key="sr"] { background-color: #fce7f3; }` : ''}
+        `;
+      } else {
+        styleRef.current.textContent = '';
+      }
+    }
+  }, []);
 
   const [pageSearchQueries, setPageSearchQueries] = useState<Record<string, string>>({});
   const [showUndoToast, setShowUndoToast] = useState(false);
@@ -863,11 +879,16 @@ function AppContent() {
   const renderTable = (config: PageConfig, rows: RowData[], tokens: string[], isSecondary: boolean) => (
     <div className="flex-1 min-h-0 overflow-auto border-none rounded-none m-0 p-0">
       <DragDropContext onDragEnd={isSecondary ? () => {} : handleDragEnd}>
-        <table className="w-full border-collapse table-fixed text-[13px]">
+        <table ref={tableRef} className="data-table w-full border-collapse table-fixed text-[13px]">
           <thead>
             <tr>
               {!isSecondary && config.rowReorderEnabled && (
-                <th className={`sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] ${hoveredColKey === 'reorder' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>
+                <th 
+                  data-col-key="reorder"
+                  className="sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] bg-[#f3f3f3]"
+                  onMouseEnter={() => handleHoverChange(null, 'reorder')}
+                  onMouseLeave={() => handleHoverChange(null, null)}
+                >
                   <input 
                     type="checkbox" 
                     className="cursor-pointer"
@@ -889,8 +910,11 @@ function AppContent() {
                 return (
                   <th 
                     key={col.key} 
-                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} ${hoveredColKey === col.key ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}
+                    data-col-key={col.key}
+                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')}`}
                     style={widthStyle}
+                    onMouseEnter={() => handleHoverChange(null, col.key)}
+                    onMouseLeave={() => handleHoverChange(null, null)}
                   >
                     <div className="flex items-center gap-1">
                       {i + 1}. {col.name} {col.sortPriority ? <span className="text-[10px] font-bold text-gray-500">(P{col.sortPriority})</span> : ''} {col.locked && '🔒'}
@@ -904,7 +928,16 @@ function AppContent() {
                   </th>
                 );
               })}
-              {!isSecondary && <th className={`sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] ${hoveredColKey === 'action' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>Act 🔒</th>}
+              {!isSecondary && (
+                <th 
+                  data-col-key="action"
+                  className="sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] bg-[#f3f3f3]"
+                  onMouseEnter={() => handleHoverChange(null, 'action')}
+                  onMouseLeave={() => handleHoverChange(null, null)}
+                >
+                  Act 🔒
+                </th>
+              )}
             </tr>
           </thead>
           <Droppable droppableId={`droppable-tbody-${isSecondary ? 'secondary' : 'primary'}`}>
@@ -926,12 +959,9 @@ function AppContent() {
                       isSecondary={isSecondary}
                       tokens={tokens}
                       isSelected={selectedRowIds.has(row.id)}
-                      isHoveredRow={hoveredRowId === row.id}
-                      hoveredColKey={hoveredColKey}
                       rowActivePopupId={activePopupId?.startsWith(`${row.id}-`) ? activePopupId : null}
                       rowActiveAnchor={activePopupId?.startsWith(`${row.id}-`) ? activeAnchor : null}
-                      setHoveredRowId={setHoveredRowId}
-                      setHoveredColKey={setHoveredColKey}
+                      handleHoverChange={handleHoverChange}
                       toggleRowSelection={toggleRowSelection}
                       setHoveredImage={setHoveredImage}
                       setPreviewContext={setPreviewContext}
@@ -954,6 +984,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen max-w-full mx-auto gap-2 p-2 bg-[#f4f7f6] text-[#333] font-sans box-border">
+      <style ref={styleRef} />
       <div className="flex justify-between items-center bg-white border border-[#d8d8d8] rounded-md p-2 px-2.5">
         <div className="text-[19px] font-bold text-[#2c3e50]">
           📦 Dynamic Inventory Platform <span className="text-[#217346] text-sm">(Pro Classic Visual)</span>

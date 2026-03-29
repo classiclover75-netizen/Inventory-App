@@ -45,6 +45,17 @@ export interface RowData {
   [key: string]: any;
 }
 
+export interface CopyBoxConfig {
+  id: string;
+  label: string;
+  sourcePage: string;
+  sourceColumn: string;
+  lookupColumn: string;
+  enabled: boolean;
+  currentValue: string;
+  currentLookupValue: string;
+}
+
 export interface AppState {
   pages: string[];
   activePage: string;
