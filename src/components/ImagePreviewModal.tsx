@@ -20,7 +20,8 @@ export const ImagePreviewModal = ({
   setActivePopupId,
   activeAnchor,
   setActiveAnchor,
-  pageName
+  pageName,
+  onCopy
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -37,6 +38,7 @@ export const ImagePreviewModal = ({
   activeAnchor: HTMLElement | null;
   setActiveAnchor: (el: HTMLElement | null) => void;
   pageName: string;
+  onCopy?: (item: string, colKey: string, pageName: string) => void;
 }) => {
   const [replaceMode, setReplaceMode] = useState<'url' | 'file'>('url');
   const [replaceUrl, setReplaceUrl] = useState('');
@@ -160,12 +162,12 @@ export const ImagePreviewModal = ({
   return (
     <div className="fixed inset-0 bg-black/45 flex items-center justify-center p-3.5 z-50">
       <div 
-        className="bg-white rounded-lg border border-[#cfd8dc] flex flex-col md:flex-row w-[95vw] max-w-[1200px] h-[90vh] overflow-hidden shadow-xl"
+        className="bg-white rounded-lg border border-[#cfd8dc] flex flex-col lg:flex-row w-[95vw] max-w-[1200px] h-[90vh] overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div 
           ref={containerRef}
-          className="w-full h-[45vh] md:h-full md:flex-1 min-w-0 bg-black relative flex flex-col overflow-hidden shrink-0"
+          className="w-full h-[45vh] lg:h-full lg:flex-1 min-w-0 bg-black relative flex flex-col overflow-hidden"
           onWheel={handleWheel}
         >
           {/* Zoom Controls Overlay */}
@@ -204,7 +206,7 @@ export const ImagePreviewModal = ({
             />
           </div>
         </div>
-        <div className="w-full md:w-[350px] shrink-0 bg-[#f8fafb] border-t md:border-t-0 md:border-l border-[#e0e6ea] flex flex-col flex-1 md:flex-none overflow-y-auto p-3.5 gap-2.5">
+        <div className="w-full lg:w-[350px] shrink-0 bg-[#f8fafb] border-t lg:border-t-0 lg:border-l border-[#e0e6ea] flex flex-col flex-1 lg:flex-none overflow-y-auto p-3.5 gap-2.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               {onBack && (
@@ -313,6 +315,9 @@ export const ImagePreviewModal = ({
                                 navigator.clipboard.writeText(item).then(() => {
                                   setActivePopupId(itemId);
                                   setActiveAnchor(target);
+                                  if (onCopy) {
+                                    onCopy(item, col.key, pageName);
+                                  }
                                 });
                               }}
                             >

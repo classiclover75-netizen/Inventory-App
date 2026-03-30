@@ -18,7 +18,9 @@ import { ReorderSearchBarsModal } from './components/ReorderSearchBarsModal';
 import { ExcelImportModal } from './components/ExcelImportModal';
 import { ExcelExportModal } from './components/ExcelExportModal';
 import { DuplicateFinderModal } from './components/DuplicateFinderModal';
-import { AppState, Column, PageConfig, RowData } from './types';
+import { GlobalCombinationCopyBoxes } from './components/GlobalCombinationCopyBoxes';
+import { GlobalCopyBoxesSettingsModal } from './components/GlobalCopyBoxesSettingsModal';
+import { AppState, Column, PageConfig, RowData, GlobalCopyBoxesSettings } from './types';
 
 const initialConfig: PageConfig = {
   rowReorderEnabled: false,
@@ -277,7 +279,8 @@ function AppContent() {
     reorderPages: false,
     reorderSearchBars: false,
     excelImport: false,
-    excelExport: false
+    excelExport: false,
+    globalCopyBoxesSettings: false
   });
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -292,6 +295,8 @@ function AppContent() {
 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [excelImportData, setExcelImportData] = useState<{ rows: any[], headers: string[] }>({ rows: [], headers: [] });
+  const [box1Value, setBox1Value] = useState('');
+  const [box2Value, setBox2Value] = useState('');
 
   useEffect(() => {
     setSelectedRowIds(new Set());
@@ -921,6 +926,16 @@ function AppContent() {
                                                 navigator.clipboard.writeText(item).then(() => {
                                                   setActivePopupId(itemId);
                                                   setActiveAnchor(target);
+                                                  
+                                                  if (state.globalCopyBoxes) {
+                                                    const currentPage = isSecondary ? activeConfig.secondarySearchPage! : state.activePage;
+                                                    if (state.globalCopyBoxes.box1.sourcePage === currentPage && state.globalCopyBoxes.box1.sourceColumn === col.key) {
+                                                      setBox1Value(item);
+                                                    }
+                                                    if (state.globalCopyBoxes.box2.sourcePage === currentPage && state.globalCopyBoxes.box2.sourceColumn === col.key) {
+                                                      setBox2Value(item);
+                                                    }
+                                                  }
                                                 });
                                               }}
                                             >
@@ -1037,6 +1052,17 @@ function AppContent() {
                   ⚙️ Active Page Settings {state.activePage ? `(${state.activePage})` : ''}
                 </button>
                 
+                <div className="text-[11px] font-bold text-[#607d8b] border-b border-[#eceff1] mb-2 mt-3 pb-1.5 uppercase tracking-wide">Global Settings</div>
+                <button 
+                  className="w-full text-left border-0 rounded bg-[#f4f6f8] text-[#263238] text-xs font-bold p-2 cursor-pointer hover:bg-[#e8edf2] mb-1"
+                  onClick={() => {
+                    setShowTopSettings(false);
+                    toggleModal('globalCopyBoxesSettings', true);
+                  }}
+                >
+                  📦 Copy Boxes Settings
+                </button>
+
                 <div className="text-[11px] font-bold text-[#607d8b] border-b border-[#eceff1] mb-2 mt-3 pb-1.5 uppercase tracking-wide">Pages Reorder</div>
                 <button 
                   className="w-full text-left border-0 rounded bg-[#f4f6f8] text-[#263238] text-xs font-bold p-2 cursor-pointer hover:bg-[#e8edf2] mb-1"
@@ -1101,6 +1127,14 @@ function AppContent() {
           ))
         )}
       </div>
+
+      {state.globalCopyBoxes && (
+        <GlobalCombinationCopyBoxes 
+          settings={state.globalCopyBoxes} 
+          box1Value={box1Value} 
+          box2Value={box2Value} 
+        />
+      )}
 
       <div className="bg-white border border-[#d8d8d8] rounded-md p-2 flex gap-2">
         {(activeConfig.searchBarOrder || ['primary', 'secondary']).map((type) => {
@@ -1351,6 +1385,16 @@ function AppContent() {
         activeAnchor={activeAnchor}
         setActiveAnchor={setActiveAnchor}
         pageName={previewContext?.pageName || state.activePage}
+        onCopy={(item, colKey, pageName) => {
+          if (state.globalCopyBoxes) {
+            if (state.globalCopyBoxes.box1.sourcePage === pageName && state.globalCopyBoxes.box1.sourceColumn === colKey) {
+              setBox1Value(item);
+            }
+            if (state.globalCopyBoxes.box2.sourcePage === pageName && state.globalCopyBoxes.box2.sourceColumn === colKey) {
+              setBox2Value(item);
+            }
+          }
+        }}
       />
 
       <ReorderPagesModal 
@@ -1436,6 +1480,16 @@ function AppContent() {
         pageName={state.activePage}
         columns={activeConfig.columns}
         rows={activeRows}
+      />
+
+      <GlobalCopyBoxesSettingsModal
+        isOpen={modals.globalCopyBoxesSettings}
+        onClose={closeAllModals}
+        state={state}
+        onSave={(settings) => {
+          setState(prev => ({ ...prev, globalCopyBoxes: settings }));
+          toast('Copy Boxes Settings saved');
+        }}
       />
 
       <DuplicateFinderModal 

@@ -56,9 +56,24 @@ export interface CopyBoxConfig {
   currentLookupValue: string;
 }
 
+export interface GlobalCopyBoxConfig {
+  sourcePage: string;
+  sourceColumn: string;
+  label?: string;
+}
+
+export interface GlobalCopyBoxesSettings {
+  box1: GlobalCopyBoxConfig;
+  box2: GlobalCopyBoxConfig;
+  box3Label?: string;
+  separator: string;
+  order: ('box1' | 'box2' | 'box3')[];
+}
+
 export interface AppState {
   pages: string[];
   activePage: string;
   pageConfigs: Record<string, PageConfig>;
   pageRows: Record<string, RowData[]>;
+  globalCopyBoxes?: GlobalCopyBoxesSettings;
 }
