@@ -127,10 +127,36 @@ function AppContent() {
   const primaryInputRef = useRef<HTMLInputElement>(null);
   const secondaryInputRef = useRef<HTMLInputElement>(null);
 
+  const [primarySearchInput, setPrimarySearchInput] = useState('');
+  const [secondarySearchInput, setSecondarySearchInput] = useState('');
+
+  useEffect(() => {
+    setPrimarySearchInput(pageSearchQueries[state.activePage] || '');
+  }, [state.activePage]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPageSearchQueries(prev => {
+        if (prev[state.activePage] === primarySearchInput) return prev;
+        return { ...prev, [state.activePage]: primarySearchInput };
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [primarySearchInput, state.activePage]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSecondarySearchQuery(secondarySearchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [secondarySearchInput]);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPageSearchQueries(prev => ({ ...prev, [state.activePage]: e.target.value }));
+    setPrimarySearchInput(e.target.value);
     setShowUndoToast(false);
-    if (e.target.value && (activeConfig.independentSearchBars === false)) setSecondarySearchQuery('');
+    if (e.target.value && (activeConfig.independentSearchBars === false)) {
+      setSecondarySearchInput('');
+    }
   };
 
   const handleClosePopup = React.useCallback(() => {
@@ -138,18 +164,18 @@ function AppContent() {
   }, []);
 
   const handleClearSearch = () => {
-    if (currentSearch) {
-      setLastSearchQuery(currentSearch);
-      setPageSearchQueries(prev => ({ ...prev, [state.activePage]: '' }));
+    if (primarySearchInput) {
+      setLastSearchQuery(primarySearchInput);
+      setPrimarySearchInput('');
       setShowUndoToast(true);
       setTimeout(() => setShowUndoToast(false), 1500);
     }
   };
 
   const handleClearSecondarySearch = () => {
-    if (secondarySearchQuery) {
-      setLastSecondarySearchQuery(secondarySearchQuery);
-      setSecondarySearchQuery('');
+    if (secondarySearchInput) {
+      setLastSecondarySearchQuery(secondarySearchInput);
+      setSecondarySearchInput('');
       setShowUndoToast(true);
       setTimeout(() => setShowUndoToast(false), 1500);
     }
@@ -158,11 +184,11 @@ function AppContent() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && showUndoToast) {
-        if (lastSearchQuery && !currentSearch) {
-          setPageSearchQueries(prev => ({ ...prev, [state.activePage]: lastSearchQuery }));
+        if (lastSearchQuery && !primarySearchInput) {
+          setPrimarySearchInput(lastSearchQuery);
           setLastSearchQuery('');
-        } else if (lastSecondarySearchQuery && !secondarySearchQuery) {
-          setSecondarySearchQuery(lastSecondarySearchQuery);
+        } else if (lastSecondarySearchQuery && !secondarySearchInput) {
+          setSecondarySearchInput(lastSecondarySearchQuery);
           setLastSecondarySearchQuery('');
         }
         setShowUndoToast(false);
@@ -170,7 +196,7 @@ function AppContent() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showUndoToast, lastSearchQuery, lastSecondarySearchQuery, currentSearch, secondarySearchQuery, state.activePage]);
+  }, [showUndoToast, lastSearchQuery, lastSecondarySearchQuery, primarySearchInput, secondarySearchInput, state.activePage]);
 
   const handleExportData = () => {
     try {
@@ -854,6 +880,7 @@ function AppContent() {
                                     <img 
                                       src={imgData} 
                                       alt="img" 
+                                      loading="lazy"
                                       className="w-full h-full object-contain cursor-pointer block"
                                       onClick={() => {
                                         setPreviewContext({ 
@@ -952,6 +979,36 @@ function AppContent() {
       </DragDropContext>
     </div>
   );
+
+  const memoizedTableContent = useMemo(() => {
+    const isSecondaryActive = activeSearchView === 'secondary' && !!(activeConfig.secondarySearchPage && state.pageConfigs[activeConfig.secondarySearchPage]);
+    const displayConfig = isSecondaryActive ? state.pageConfigs[activeConfig.secondarySearchPage!] : activeConfig;
+    const displayRows = isSecondaryActive ? secondaryFilteredRows : filteredRows;
+    const displayTokens = isSecondaryActive ? secondarySearchTokens : searchTokens;
+    
+    return (
+      <div className="w-full h-full flex flex-col text-[#333] text-left m-0 p-0">
+        {isSecondaryActive && (
+          <div className="bg-[#e8edf2] px-3 py-1.5 text-sm font-bold text-[#2b579a] border-y border-[#d8d8d8]">
+            Viewing Secondary Data: {activeConfig.secondarySearchPage}
+          </div>
+        )}
+        {renderTable(displayConfig, displayRows, displayTokens, isSecondaryActive)}
+      </div>
+    );
+  }, [
+    activeSearchView,
+    activeConfig,
+    state.pageConfigs,
+    secondaryFilteredRows,
+    filteredRows,
+    secondarySearchTokens,
+    searchTokens,
+    selectedRowIds,
+    activePopupId,
+    activeAnchor,
+    state.activePage
+  ]);
 
   return (
     <div className="flex flex-col h-screen max-w-full mx-auto gap-2 p-2 bg-[#f4f7f6] text-[#333] font-sans box-border">
@@ -1055,11 +1112,11 @@ function AppContent() {
                     ref={primaryInputRef}
                     className="border-2 border-[#217346] text-sm w-full" 
                     placeholder="" 
-                    value={currentSearch}
+                    value={primarySearchInput}
                     onChange={handleSearchChange}
                     onFocus={() => setActiveSearchView('primary')}
                   />
-                  {!currentSearch && (
+                  {!primarySearchInput && (
                     <div className="absolute inset-y-0 left-0 flex items-center pl-[10px] pointer-events-none text-gray-400 text-sm whitespace-nowrap">
                       🔍 Search Data {state.activePage ? <>For "<strong>{state.activePage}</strong>"</> : ""}
                     </div>
@@ -1081,7 +1138,7 @@ function AppContent() {
                 </div>
 
                 {/* Toast Notification */}
-                {showUndoToast && (
+                {showUndoToast && !primarySearchInput && lastSearchQuery && (
                   <div className="absolute top-full mt-2 right-0 bg-[#2b579a] text-white text-[11px] font-medium px-3 py-1.5 rounded shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
                     <span>Tip: Press <b>Ctrl+Z</b> to undo</span>
                   </div>
@@ -1096,15 +1153,15 @@ function AppContent() {
                     ref={secondaryInputRef}
                     className="border-2 border-[#2b579a] text-sm w-full" 
                     placeholder="" 
-                    value={secondarySearchQuery}
+                    value={secondarySearchInput}
                     onChange={e => {
-                      setSecondarySearchQuery(e.target.value);
+                      setSecondarySearchInput(e.target.value);
                       setShowUndoToast(false);
-                      if (e.target.value && (activeConfig.independentSearchBars === false)) setPageSearchQueries(prev => ({ ...prev, [state.activePage]: '' }));
+                      if (e.target.value && (activeConfig.independentSearchBars === false)) setPrimarySearchInput('');
                     }}
                     onFocus={() => setActiveSearchView('secondary')}
                   />
-                  {!secondarySearchQuery && (
+                  {!secondarySearchInput && (
                     <div className="absolute inset-y-0 left-0 flex items-center pl-[10px] pointer-events-none text-gray-400 text-sm whitespace-nowrap">
                       🔍 Search Data For "<strong>{activeConfig.secondarySearchPage}</strong>" (Secondary Search)
                     </div>
@@ -1126,7 +1183,7 @@ function AppContent() {
                 </div>
 
                 {/* Toast Notification for Secondary Search */}
-                {showUndoToast && !secondarySearchQuery && lastSecondarySearchQuery && (
+                {showUndoToast && !secondarySearchInput && lastSecondarySearchQuery && (
                   <div className="absolute top-full mt-2 right-0 bg-[#2b579a] text-white text-[11px] font-medium px-3 py-1.5 rounded shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
                     <span>Tip: Press <b>Ctrl+Z</b> to undo</span>
                   </div>
@@ -1144,23 +1201,7 @@ function AppContent() {
             Blank Workspace Area<br/>
             <span className="text-xs font-semibold text-[#b0bec5]">(search bar intentionally kept as requested)</span>
           </div>
-        ) : (() => {
-          const isSecondaryActive = activeSearchView === 'secondary' && !!(activeConfig.secondarySearchPage && state.pageConfigs[activeConfig.secondarySearchPage]);
-          const displayConfig = isSecondaryActive ? state.pageConfigs[activeConfig.secondarySearchPage!] : activeConfig;
-          const displayRows = isSecondaryActive ? secondaryFilteredRows : filteredRows;
-          const displayTokens = isSecondaryActive ? secondarySearchTokens : searchTokens;
-          
-          return (
-            <div className="w-full h-full flex flex-col text-[#333] text-left m-0 p-0">
-              {isSecondaryActive && (
-                <div className="bg-[#e8edf2] px-3 py-1.5 text-sm font-bold text-[#2b579a] border-y border-[#d8d8d8]">
-                  Viewing Secondary Data: {activeConfig.secondarySearchPage}
-                </div>
-              )}
-              {renderTable(displayConfig, displayRows, displayTokens, isSecondaryActive)}
-            </div>
-          );
-        })()}
+        ) : memoizedTableContent}
       </div>
 
       <CreatePageModal 
