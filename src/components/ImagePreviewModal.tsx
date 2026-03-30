@@ -160,14 +160,31 @@ export const ImagePreviewModal = ({
   return (
     <div className="fixed inset-0 bg-black/45 flex items-center justify-center p-3.5 z-50">
       <div 
-        className="bg-white rounded-lg border border-[#cfd8dc] flex flex-col md:flex-row w-[min(1100px,96vw)] max-h-[88vh] overflow-hidden"
+        className="bg-white rounded-lg border border-[#cfd8dc] flex flex-col md:flex-row w-[min(1100px,96vw)] max-h-[95vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div 
           ref={containerRef}
-          className="flex-[1.6] min-h-[300px] md:min-h-[520px] bg-black flex flex-col justify-center items-center p-2.5 relative overflow-hidden group"
+          className="flex-1 min-w-0 min-h-[250px] bg-black relative flex flex-col overflow-hidden"
           onWheel={handleWheel}
         >
+          {/* Zoom Controls Overlay */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm p-1.5 rounded-full border border-white/20 z-10">
+            <button onClick={handleZoomOut} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Zoom Out">
+              <ZoomOut size={18} />
+            </button>
+            <div className="text-white text-[11px] font-bold min-w-[40px] text-center">
+              {Math.round(scale * 100)}%
+            </div>
+            <button onClick={handleZoomIn} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Zoom In">
+              <ZoomIn size={18} />
+            </button>
+            <div className="w-px h-4 bg-white/20 mx-1" />
+            <button onClick={handleReset} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Reset">
+              <RotateCcw size={18} />
+            </button>
+          </div>
+
           <div 
             className="w-full h-full flex justify-center items-center"
             onMouseDown={handleMouseDown}
@@ -186,25 +203,8 @@ export const ImagePreviewModal = ({
               draggable={false}
             />
           </div>
-
-          {/* Zoom Controls Overlay */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm p-1.5 rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            <button onClick={handleZoomOut} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Zoom Out">
-              <ZoomOut size={18} />
-            </button>
-            <div className="text-white text-[11px] font-bold min-w-[40px] text-center">
-              {Math.round(scale * 100)}%
-            </div>
-            <button onClick={handleZoomIn} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Zoom In">
-              <ZoomIn size={18} />
-            </button>
-            <div className="w-px h-4 bg-white/20 mx-1" />
-            <button onClick={handleReset} className="p-1.5 text-white hover:bg-white/20 rounded-full transition-colors border-0 bg-transparent cursor-pointer" title="Reset">
-              <RotateCcw size={18} />
-            </button>
-          </div>
         </div>
-        <div className="flex-1 min-w-[320px] bg-[#f8fafb] border-l border-[#e0e6ea] flex flex-col overflow-auto p-3.5 gap-2.5">
+        <div className="w-full md:w-[350px] md:shrink-0 bg-[#f8fafb] border-t md:border-t-0 md:border-l border-[#e0e6ea] flex flex-col overflow-auto p-3.5 gap-2.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               {onBack && (
