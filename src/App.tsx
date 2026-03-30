@@ -36,8 +36,78 @@ function AppContent() {
     pageRows: {}
   });
 
-  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-  const [hoveredColKey, setHoveredColKey] = useState<string | null>(null);
+  const hoveredCellRef = useRef<HTMLTableCellElement | null>(null);
+
+  const applyHover = (td: HTMLTableCellElement) => {
+    const tr = td.parentElement as HTMLTableRowElement;
+    if (!tr) return;
+    const table = tr.closest('table');
+    if (!table) return;
+
+    const cellIndex = td.cellIndex;
+    
+    td.dataset.hoveredExact = 'true';
+    
+    const cellsInRow = tr.children;
+    for (let i = 0; i < cellsInRow.length; i++) {
+      const cell = cellsInRow[i] as HTMLTableCellElement;
+      cell.dataset.hoveredRow = 'true';
+    }
+    
+    const rows = table.rows;
+    for (let i = 0; i < rows.length; i++) {
+      const cellInCol = rows[i].children[cellIndex] as HTMLTableCellElement;
+      if (cellInCol) {
+        cellInCol.dataset.hoveredCol = 'true';
+      }
+    }
+  };
+
+  const cleanupHover = (td: HTMLTableCellElement) => {
+    const root = td.closest('table') || document;
+    
+    const exacts = root.querySelectorAll('[data-hovered-exact]');
+    for (let i = 0; i < exacts.length; i++) {
+      delete (exacts[i] as HTMLElement).dataset.hoveredExact;
+    }
+    
+    const rows = root.querySelectorAll('[data-hovered-row]');
+    for (let i = 0; i < rows.length; i++) {
+      delete (rows[i] as HTMLElement).dataset.hoveredRow;
+    }
+    
+    const cols = root.querySelectorAll('[data-hovered-col]');
+    for (let i = 0; i < cols.length; i++) {
+      delete (cols[i] as HTMLElement).dataset.hoveredCol;
+    }
+  };
+
+  const handleTableMouseOver = (e: React.MouseEvent<HTMLTableElement>) => {
+    const td = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement;
+    if (!td) return;
+    
+    if (hoveredCellRef.current === td) return;
+    
+    if (hoveredCellRef.current) {
+      cleanupHover(hoveredCellRef.current);
+    }
+    
+    hoveredCellRef.current = td;
+    applyHover(td);
+  };
+
+  const handleTableMouseOut = (e: React.MouseEvent<HTMLTableElement>) => {
+    const td = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement;
+    if (!td) return;
+    
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (td.contains(relatedTarget)) return;
+    
+    if (hoveredCellRef.current === td) {
+      cleanupHover(td);
+      hoveredCellRef.current = null;
+    }
+  };
   const [activePopupId, setActivePopupId] = useState<string | null>(null);
   const [activeAnchor, setActiveAnchor] = useState<HTMLElement | null>(null);
 
@@ -653,11 +723,15 @@ function AppContent() {
   const renderTable = (config: PageConfig, rows: RowData[], tokens: string[], isSecondary: boolean) => (
     <div className="flex-1 min-h-0 overflow-auto border-none rounded-none m-0 p-0">
       <DragDropContext onDragEnd={isSecondary ? () => {} : handleDragEnd}>
-        <table className="w-full border-collapse table-fixed text-[13px]">
+        <table 
+          className="w-full border-collapse table-fixed text-[13px]"
+          onMouseOver={handleTableMouseOver}
+          onMouseOut={handleTableMouseOut}
+        >
           <thead>
             <tr>
               {!isSecondary && config.rowReorderEnabled && (
-                <th className={`sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] ${hoveredColKey === 'reorder' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>
+                <th className={`sticky top-0 z-10 text-center p-1.5 border-r border-b border-[#e0e0e0] w-[60px] bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}>
                   <input 
                     type="checkbox" 
                     className="cursor-pointer"
@@ -679,7 +753,7 @@ function AppContent() {
                 return (
                   <th 
                     key={col.key} 
-                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} ${hoveredColKey === col.key ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}
+                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}
                     style={widthStyle}
                   >
                     <div className="flex items-center gap-1">
@@ -694,7 +768,7 @@ function AppContent() {
                   </th>
                 );
               })}
-              <th className={`sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] ${hoveredColKey === 'action' ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]'}`}>Act 🔒</th>
+              <th className={`sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}>Act 🔒</th>
             </tr>
           </thead>
           <Droppable droppableId={`droppable-tbody-${isSecondary ? 'secondary' : 'primary'}`}>
@@ -723,9 +797,7 @@ function AppContent() {
                         >
                           {!isSecondary && config.rowReorderEnabled && (
                             <td 
-                              className={`text-center p-1.5 border-r border-b border-[#e0e0e0] ${(hoveredRowId === row.id && hoveredColKey === 'reorder') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === 'reorder' ? 'bg-[#f0f7ff]' : ''))}`}
-                              onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('reorder'); }}
-                              onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+                              className={`text-center p-1.5 border-r border-b border-[#e0e0e0] data-[hovered-col=true]:bg-[#f0f7ff] data-[hovered-row=true]:bg-[#e8f0fe] data-[hovered-exact=true]:!bg-[#d2e3fc] data-[hovered-exact=true]:outline data-[hovered-exact=true]:outline-[3px] data-[hovered-exact=true]:outline-[#2b579a] data-[hovered-exact=true]:relative data-[hovered-exact=true]:z-10 data-[hovered-exact=true]:shadow-inner`}
                             >
                               <div className="flex items-center justify-center gap-2">
                                 <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-700">
@@ -747,21 +819,15 @@ function AppContent() {
                           )}
                           {config.columns.map((col, colIndex) => {
                             const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
-                            const isExactHover = hoveredRowId === row.id && hoveredColKey === col.key;
-                            const hoverClass = isExactHover 
-                              ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' 
-                              : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === col.key ? 'bg-[#f0f7ff]' : ''));
+                            const hoverClass = 'data-[hovered-col=true]:bg-[#f0f7ff] data-[hovered-row=true]:bg-[#e8f0fe] data-[hovered-exact=true]:!bg-[#d2e3fc] data-[hovered-exact=true]:outline data-[hovered-exact=true]:outline-[3px] data-[hovered-exact=true]:outline-[#2b579a] data-[hovered-exact=true]:relative data-[hovered-exact=true]:z-10 data-[hovered-exact=true]:shadow-inner';
                             
                             const commonProps = {
-                              onMouseEnter: () => { setHoveredRowId(row.id); setHoveredColKey(col.key); },
-                              onMouseLeave: () => { setHoveredRowId(null); setHoveredColKey(null); },
                               style: widthStyle
                             };
 
                             if (col.key === 'sr') {
-                              const srBgClass = hoveredRowId === row.id ? 'bg-[#fce7f3]' : 'bg-[#f3f3f3]';
                               const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
-                              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] ${srBgClass} overflow-hidden`}>{rowIndex + 1}</td>;
+                              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] data-[hovered-row=true]:bg-[#fce7f3] overflow-hidden`}>{rowIndex + 1}</td>;
                             }
                             
                             const rawVal = row[col.key];
@@ -781,8 +847,6 @@ function AppContent() {
                                     }
                                   }}
                                   onMouseLeave={() => {
-                                    setHoveredRowId(null);
-                                    setHoveredColKey(null);
                                     setHoveredImage(null);
                                   }}
                                 >
@@ -867,9 +931,7 @@ function AppContent() {
                             );
                           })}
                           <td 
-                            className={`w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden ${(hoveredRowId === row.id && hoveredColKey === 'action') ? 'bg-[#d2e3fc] outline outline-[3px] outline-[#2b579a] relative z-10 shadow-inner' : (hoveredRowId === row.id ? 'bg-[#e8f0fe]' : (hoveredColKey === 'action' ? 'bg-[#f0f7ff]' : ''))}`}
-                            onMouseEnter={() => { setHoveredRowId(row.id); setHoveredColKey('action'); }}
-                            onMouseLeave={() => { setHoveredRowId(null); setHoveredColKey(null); }}
+                            className={`w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden data-[hovered-col=true]:bg-[#f0f7ff] data-[hovered-row=true]:bg-[#e8f0fe] data-[hovered-exact=true]:!bg-[#d2e3fc] data-[hovered-exact=true]:outline data-[hovered-exact=true]:outline-[3px] data-[hovered-exact=true]:outline-[#2b579a] data-[hovered-exact=true]:relative data-[hovered-exact=true]:z-10 data-[hovered-exact=true]:shadow-inner`}
                           >
                             <button className="border-0 bg-transparent cursor-pointer text-[15px] mr-1" onClick={() => { 
                               setEditingRowId(row.id); 
