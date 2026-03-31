@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 import { X, ArrowLeft } from 'lucide-react';
 
-export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'dark' | 'blue' | 'green' | 'red' | 'orange' | 'outline' | 'secondary' }>(
+export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'dark' | 'blue' | 'green' | 'red' | 'orange' | 'outline' }>(
   ({ className, variant = 'dark', ...props }, ref) => {
     const variants = {
       dark: 'bg-gray-800 text-white hover:bg-gray-700',
@@ -11,7 +11,6 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
       red: 'bg-[#b71c1c] text-white hover:bg-red-800',
       orange: 'bg-[#e65100] text-white hover:bg-orange-800',
       outline: 'border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200',
-      secondary: 'bg-[#f3f4f6] text-[#37474f] border border-[#cfd8dc] hover:bg-[#e2e8f0]',
     };
     return (
       <button
@@ -59,54 +58,6 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
   }
 );
 Select.displayName = 'Select';
-
-export const SelectableDropdown = ({
-  value,
-  onChange,
-  options,
-  className,
-  disabled
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  className?: string;
-  disabled?: boolean;
-}) => {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const selectedOption = options.find(o => o.value === value);
-
-  return (
-    <div className={cn("relative w-full", className)}>
-      <div
-        className={cn(
-          "w-full border border-[#cfd8dc] rounded px-2 py-1.5 text-[13px] bg-white cursor-pointer flex justify-between items-center",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-      >
-        <span className="cursor-text select-text">{selectedOption?.label || 'Select...'}</span>
-        <span className="text-[10px] text-gray-400">▼</span>
-      </div>
-      {isOpen && (
-        <div className="absolute top-full left-0 w-full border border-[#cfd8dc] rounded mt-1 bg-white z-50 shadow-lg max-h-60 overflow-y-auto">
-          {options.map(option => (
-            <div
-              key={option.value}
-              className="px-2 py-1.5 text-[13px] hover:bg-blue-50 cursor-pointer select-text"
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-            >
-              {option.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export const Modal = ({ isOpen, onClose, onBack, title, children, width = 'min(900px, 96vw)', noScroll = false }: { isOpen: boolean; onClose: () => void; onBack?: () => void; title: string | React.ReactNode; children: React.ReactNode; width?: string; noScroll?: boolean }) => {
   if (!isOpen) return null;
