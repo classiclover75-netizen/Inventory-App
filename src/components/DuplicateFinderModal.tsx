@@ -80,11 +80,11 @@ export const DuplicateFinderModal: React.FC<DuplicateFinderModalProps> = ({
                         {columns
                           .filter((c) => !['id', '_id', 'sr', 'images'].includes(c.key) && c.type !== 'image')
                           .map((col) => (
-                            <th key={col.key} className="text-left p-2 font-semibold text-gray-600 border-r border-gray-200 last:border-r-0">
+                            <th key={col.key} className="text-left p-2 font-bold text-gray-600 border-r border-gray-200 last:border-r-0 text-[14px] font-['Arial']">
                               {col.name}
                             </th>
                           ))}
-                        <th className="w-[80px] text-center p-2 font-semibold text-gray-600">Action</th>
+                        <th className="w-[80px] text-center p-2 font-bold text-gray-600 text-[14px] font-['Arial']">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -96,7 +96,7 @@ export const DuplicateFinderModal: React.FC<DuplicateFinderModalProps> = ({
                               const val = row[col.key];
                               const displayVal = Array.isArray(val) ? val.join(', ') : String(val || '');
                               return (
-                                <td key={col.key} className="p-2 border-r border-gray-100 last:border-r-0 truncate max-w-[150px]" title={displayVal}>
+                                <td key={col.key} className="p-2 border-r border-gray-100 last:border-r-0 truncate max-w-[150px] text-[14px] font-['Arial'] font-normal" title={displayVal}>
                                   {displayVal}
                                 </td>
                               );

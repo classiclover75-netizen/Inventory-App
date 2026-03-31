@@ -203,7 +203,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                       }} />
                     </th>
                     {columns.map((c, i) => (
-                      <th key={c.key} className="p-2 border text-left">
+                      <th key={c.key} className="p-2 border text-left font-bold text-[14px] font-['Arial']">
                         <div className="flex items-center gap-1">
                           {i + 1}. {c.name} {c.locked && '🔒'}
                         </div>
@@ -228,7 +228,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                         />
                       </td>
                       {columns.map(c => (
-                        <td key={c.key} className="p-2 border whitespace-normal break-words min-w-[150px]">
+                        <td key={c.key} className="p-2 border whitespace-normal break-words min-w-[150px] text-[14px] font-['Arial'] font-normal">
                           {c.type === 'image' && row[c.key] ? 
                             <img src={String(row[c.key])} className="h-10 w-10 object-contain mx-auto rounded" alt="img" /> 
                             : highlightText(String(row[c.key] || ''), deferredSearchQuery)

@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Input, Modal } from './ui';
 import { Column, RowData } from '../types';
 import { useToast } from './ToastProvider';
-import { Trash2, Plus, Wand2, Lock, RotateCcw, Undo2, X, Palette } from 'lucide-react';
-import { RichTextEditor } from './RichTextEditor';
-import { ColorPicker } from './ColorPicker';
+import { Trash2, Plus, Wand2, Lock, RotateCcw, Undo2, X } from 'lucide-react';
 
 export const AddRowModal = ({
   isOpen,
@@ -194,12 +192,8 @@ export const AddRowModal = ({
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const payload: RowData = { 
-        id: (editingRow && i === 0) ? editingRow.id : `${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`,
-        rowBgColor: block.rowBgColor,
-        cellBgColors: block.cellBgColors
-      };
-      let hasAnyValue = block.rowBgColor || (block.cellBgColors && Object.keys(block.cellBgColors).length > 0);
+      const payload: RowData = { id: (editingRow && i === 0) ? editingRow.id : `${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}` };
+      let hasAnyValue = false;
 
       for (const col of editableCols) {
         let val = block[col.key];
@@ -310,7 +304,7 @@ export const AddRowModal = ({
       ) : (
         <div className="space-y-3">
           {blocks.map((block, i) => (
-            <div key={i} className="border border-[#d7dde1] rounded-md p-2.5" style={{ backgroundColor: block.rowBgColor || '#fafcfe' }}>
+            <div key={i} className="border border-[#d7dde1] rounded-md p-2.5 bg-[#fafcfe]">
               <div className="flex justify-between items-center mb-2">
                 <div className="text-xs font-bold text-[#2b579a]">Row {i + 1}</div>
                 <div className="flex gap-2">
@@ -321,92 +315,30 @@ export const AddRowModal = ({
                   <Button variant="red" onClick={() => handleRemoveBlock(i)}><Trash2 size={14} /> Delete</Button>
                 </div>
               </div>
-              <div className="flex flex-col gap-3 mb-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                <div className="flex items-center gap-2 text-[#2b579a] font-bold text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  <Palette size={14} />
-                  Advanced Coloring
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] font-bold text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>Row Background:</label>
-                    <ColorPicker 
-                      color={block.rowBgColor || '#ffffff'}
-                      onChange={val => handleUpdateField(i, 'rowBgColor', val)}
-                    />
-                    <Button 
-                      variant="outline" 
-                      className="h-6 px-1.5 text-[9px]" 
-                      onClick={() => handleUpdateField(i, 'rowBgColor', '')}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {editableCols.map(col => (
-                  <div key={col.key} className="flex flex-col p-2 border border-gray-100 rounded" style={{ backgroundColor: block.cellBgColors?.[col.key] || block.rowBgColor || '#ffffff' }}>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-[10px] font-bold text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>{col.name} ({col.type})</label>
-                      <div className="flex items-center gap-1">
-                        <label className="text-[9px] font-bold text-gray-400" style={{ fontFamily: 'Arial, sans-serif' }}>Cell BG:</label>
-                        <ColorPicker 
-                          size="sm"
-                          color={block.cellBgColors?.[col.key] || '#ffffff'}
-                          onChange={val => {
-                            const newCellBgColors = { ...(block.cellBgColors || {}) };
-                            newCellBgColors[col.key] = val;
-                            handleUpdateField(i, 'cellBgColors', newCellBgColors);
-                          }}
-                        />
-                        <button 
-                          className="text-[9px] text-gray-400 hover:text-red-500 border-0 bg-transparent cursor-pointer"
-                          onClick={() => {
-                            const newCellBgColors = { ...(block.cellBgColors || {}) };
-                            delete newCellBgColors[col.key];
-                            handleUpdateField(i, 'cellBgColors', newCellBgColors);
-                          }}
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
+                  <div key={col.key} className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-600 mb-1">{col.name} ({col.type})</label>
                     {col.type === 'multi_text' ? (
-                      <RichTextEditor 
-                        className="w-full"
-                        value={Array.isArray(block[col.key]) ? block[col.key].join('<br/>') : block[col.key] || ''}
-                        onChange={val => handleUpdateField(i, col.key, val.split('<br/>'))}
+                      <textarea 
+                        className="w-full min-h-[90px] border border-[#cfd8dc] rounded p-1.5 text-[13px]"
+                        placeholder="One value per line"
+                        value={Array.isArray(block[col.key]) ? block[col.key].join('\n') : block[col.key] || ''}
+                        onChange={e => handleUpdateField(i, col.key, e.target.value.split('\n'))}
                       />
                     ) : col.type === 'text_with_copy_button' ? (
                       <div className="flex flex-col gap-1">
                         {(Array.isArray(block[col.key]) && block[col.key].length > 0 ? block[col.key] : ['']).map((val: string, idx: number) => (
-                          <div key={idx} className="relative group">
-                            <RichTextEditor 
-                              value={val} 
-                              onChange={newVal => {
-                                const newArr = [...(Array.isArray(block[col.key]) ? block[col.key] : [''])];
-                                newArr[idx] = newVal;
-                                handleUpdateField(i, col.key, newArr);
-                              }}
-                            />
-                            <button 
-                              type="button"
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
-                              onClick={() => {
-                                const currentArr = Array.isArray(block[col.key]) ? block[col.key] : [''];
-                                if (currentArr.length > 1) {
-                                  const newArr = currentArr.filter((_, subIdx) => subIdx !== idx);
-                                  handleUpdateField(i, col.key, newArr);
-                                } else {
-                                  // If only one box left, just clear it
-                                  handleUpdateField(i, col.key, ['']);
-                                }
-                              }}
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
+                          <Input 
+                            key={idx} 
+                            value={val} 
+                            placeholder={`Item ${idx + 1}`}
+                            onChange={e => {
+                              const newArr = [...(Array.isArray(block[col.key]) ? block[col.key] : [''])];
+                              newArr[idx] = e.target.value;
+                              handleUpdateField(i, col.key, newArr);
+                            }}
+                          />
                         ))}
                         <button 
                           type="button" 
@@ -539,9 +471,11 @@ export const AddRowModal = ({
                         )}
                       </div>
                     ) : (
-                      <RichTextEditor 
+                      <Input 
+                        type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
+                        placeholder={`Enter ${col.name}`}
                         value={block[col.key] || ''}
-                        onChange={val => handleUpdateField(i, col.key, val)}
+                        onChange={e => handleUpdateField(i, col.key, e.target.value)}
                       />
                     )}
                   </div>

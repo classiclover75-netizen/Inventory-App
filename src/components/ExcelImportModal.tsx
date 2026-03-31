@@ -405,7 +405,7 @@ export const ExcelImportModal = ({ isOpen, onClose, onBack, onImport, existingCo
                   const existingCol = existingColumns.find(c => c.name.toLowerCase() === h.toLowerCase());
                   const isNew = !existingCol;
                   return (
-                    <th key={h} className={`p-2 border text-left font-bold ${isNew ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}>
+                    <th key={h} className={`p-2 border text-left font-bold text-[14px] font-['Arial'] ${isNew ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}>
                       <div className="flex items-center gap-1">
                         {i + 1}. {h} {existingCol?.locked && '🔒'}
                         {isNew && <span className="text-[9px] block font-normal ml-1">(New Column)</span>}
@@ -426,7 +426,7 @@ export const ExcelImportModal = ({ isOpen, onClose, onBack, onImport, existingCo
                 finalRows.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
                     {headers.map(h => (
-                      <td key={h} className="p-2 border whitespace-normal break-words min-w-[150px]">
+                      <td key={h} className="p-2 border whitespace-normal break-words min-w-[150px] text-[14px] font-['Arial'] font-normal">
                         {String(row[h]).startsWith('data:image') ? 
                           <img src={row[h]} className="h-10 w-10 object-contain mx-auto rounded shadow-sm" alt="excel-img" /> 
                           : highlightText(String(row[h] || ''), deferredSearchQuery)}

@@ -32,8 +32,7 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
         box1: { sourcePage: '', sourceColumn: '' },
         box2: { sourcePage: '', sourceColumn: '' },
         separator: '-',
-        order: ['box1', 'box2', 'box3'],
-        isEnabled: true
+        order: ['box1', 'box2', 'box3']
       });
     }
   }, [isOpen, state.globalCopyBoxes]);
@@ -62,17 +61,25 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📦 Copy Boxes Settings">
       <div className="space-y-4">
-        <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-          <input
-            type="checkbox"
-            checked={settings.isEnabled ?? true}
-            onChange={(e) => setSettings({ ...settings, isEnabled: e.target.checked })}
-          />
-          Enable Global Copy Boxes
-        </label>
+        <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <div>
+            <h4 className="font-bold text-sm text-gray-800 m-0">Enable Copy Boxes</h4>
+            <p className="text-xs text-gray-500 m-0">Show the global copy boxes section at the top of the page</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input 
+              type="checkbox" 
+              className="sr-only peer"
+              checked={settings.enabled ?? true}
+              onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
 
-        <div className="space-y-2">
-          <h4 className="font-bold text-sm text-gray-700 m-0">Box 1 Configuration</h4>
+        <div className={`space-y-4 ${!(settings.enabled ?? true) ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="space-y-2">
+            <h4 className="font-bold text-sm text-gray-700 m-0">Box 1 Configuration</h4>
           <Input
             value={settings.box1.label || ''}
             onChange={(e) => setSettings({ ...settings, box1: { ...settings.box1, label: e.target.value } })}
@@ -175,6 +182,8 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
               )}
             </Droppable>
           </DragDropContext>
+        </div>
+
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

@@ -63,12 +63,12 @@ export interface GlobalCopyBoxConfig {
 }
 
 export interface GlobalCopyBoxesSettings {
+  enabled?: boolean;
   box1: GlobalCopyBoxConfig;
   box2: GlobalCopyBoxConfig;
   box3Label?: string;
   separator: string;
   order: ('box1' | 'box2' | 'box3')[];
-  isEnabled?: boolean;
 }
 
 export interface AppState {

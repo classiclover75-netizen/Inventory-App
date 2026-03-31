@@ -779,12 +779,12 @@ function AppContent() {
               )}
               {config.columns.map((col, i) => {
                 const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
-                const defaultWidthClass = col.key === 'sr' ? 'w-[130px] text-center' : col.type === 'image' ? 'w-[137px] text-center' : 'min-w-[130px] text-left';
+                const defaultWidthClass = col.key === 'sr' ? 'w-[100px] text-center' : col.type === 'image' ? 'w-[137px] text-center' : 'min-w-[130px] text-left';
                 
                 return (
                   <th 
                     key={col.key} 
-                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3] ${col.key === 'sr' ? 'sticky left-0 z-[30]' : ''}`}
+                    className={`sticky top-0 z-10 text-[14px] font-['Arial'] font-bold text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}
                     style={widthStyle}
                   >
                     <div className="flex items-center gap-1">
@@ -856,21 +856,17 @@ function AppContent() {
                             };
 
                             if (col.key === 'sr') {
-                              const srWidthStyle = col.width ? widthStyle : { width: '130px', minWidth: '130px' };
+                              const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
                               return (
-                                <td 
-                                  key={col.key} 
-                                  {...commonProps} 
-                                  style={{...commonProps.style, ...srWidthStyle}} 
-                                  className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-white data-[hovered-row=true]:bg-[#fce7f3] overflow-hidden sticky left-0 z-[20]`}
-                                >
-                                  <div className="flex items-center justify-center gap-1">
-                                    <button className="border-0 bg-transparent cursor-pointer text-[15px]" onClick={() => { 
+                                <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`text-[14px] font-['Arial'] font-normal text-center p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] data-[hovered-row=true]:bg-[#fce7f3] overflow-hidden`}>
+                                  <div className="flex items-center justify-center gap-2">
+                                    <span>{rowIndex + 1}</span>
+                                    <button className="border-0 bg-transparent cursor-pointer text-[13px] hover:scale-110 transition-transform" onClick={(e) => { 
+                                      e.stopPropagation();
                                       setEditingRowId(row.id); 
                                       setEditingPageName(isSecondary ? activeConfig.secondarySearchPage! : state.activePage);
                                       toggleModal('addRow', true); 
                                     }}>✏️</button>
-                                    <span>{rowIndex + 1}</span>
                                   </div>
                                 </td>
                               );
@@ -885,7 +881,7 @@ function AppContent() {
                                 <td 
                                   key={col.key} 
                                   {...commonProps} 
-                                  className={`text-center p-0 border-r border-b border-[#e0e0e0] ${hoverClass} bg-white overflow-hidden`}
+                                  className={`text-center p-0 border-r border-b border-[#e0e0e0] ${hoverClass} bg-white overflow-hidden text-[14px] font-['Arial'] font-normal`}
                                   style={{...commonProps.style, height: `${config.rowHeight || 100}px`}}
                                   onMouseMove={(e) => {
                                     if (isImg && config.hoverPreviewEnabled) {
@@ -926,7 +922,7 @@ function AppContent() {
                                 : hoverClass;
                               
                               return (
-                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${cellClass} overflow-hidden`}>
+                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${cellClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
                                   {items.length > 0 && (
                                     <div className="flex flex-col gap-1">
                                       {items.map((item, i) => {
@@ -975,19 +971,18 @@ function AppContent() {
 
                             if (Array.isArray(rawVal)) {
                               return (
-                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
                                   {rawVal.map((v, i) => <React.Fragment key={i}>{highlightText(v, tokens)}<br/></React.Fragment>)}
                                 </td>
                               );
                             }
 
                             return (
-                              <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden`}>
+                              <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
                                 {highlightText(rawVal, tokens)}
                               </td>
                             );
                           })}
-                          {/* Act column removed */}
                         </tr>
                       )}
                     </Draggable>
@@ -1135,7 +1130,7 @@ function AppContent() {
         )}
       </div>
 
-      {state.globalCopyBoxes && (state.globalCopyBoxes.isEnabled ?? true) && (
+      {state.globalCopyBoxes && state.globalCopyBoxes.enabled !== false && (
         <GlobalCombinationCopyBoxes 
           settings={state.globalCopyBoxes} 
           box1Value={box1Value} 
