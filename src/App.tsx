@@ -1128,7 +1128,7 @@ function AppContent() {
         )}
       </div>
 
-      {state.globalCopyBoxes && (state.globalCopyBoxes.isEnabled ?? true) && (
+      {state.globalCopyBoxes && (
         <GlobalCombinationCopyBoxes 
           settings={state.globalCopyBoxes} 
           box1Value={box1Value} 

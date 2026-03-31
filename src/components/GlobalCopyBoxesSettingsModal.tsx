@@ -61,15 +61,6 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📦 Copy Boxes Settings">
       <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="checkbox"
-            id="isEnabled"
-            checked={settings.isEnabled ?? true}
-            onChange={(e) => setSettings({ ...settings, isEnabled: e.target.checked })}
-          />
-          <label htmlFor="isEnabled" className="text-sm font-bold text-gray-700">Enable Global Copy Boxes</label>
-        </div>
         <div className="space-y-2">
           <h4 className="font-bold text-sm text-gray-700 m-0">Box 1 Configuration</h4>
           <Input
