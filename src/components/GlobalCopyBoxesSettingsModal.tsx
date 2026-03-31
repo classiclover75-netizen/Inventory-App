@@ -32,7 +32,8 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
         box1: { sourcePage: '', sourceColumn: '' },
         box2: { sourcePage: '', sourceColumn: '' },
         separator: '-',
-        order: ['box1', 'box2', 'box3']
+        order: ['box1', 'box2', 'box3'],
+        isEnabled: true
       });
     }
   }, [isOpen, state.globalCopyBoxes]);
@@ -61,6 +62,15 @@ export const GlobalCopyBoxesSettingsModal: React.FC<GlobalCopyBoxesSettingsModal
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📦 Copy Boxes Settings">
       <div className="space-y-4">
+        <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+          <input
+            type="checkbox"
+            checked={settings.isEnabled ?? true}
+            onChange={(e) => setSettings({ ...settings, isEnabled: e.target.checked })}
+          />
+          Enable Global Copy Boxes
+        </label>
+
         <div className="space-y-2">
           <h4 className="font-bold text-sm text-gray-700 m-0">Box 1 Configuration</h4>
           <Input
