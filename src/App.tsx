@@ -779,12 +779,12 @@ function AppContent() {
               )}
               {config.columns.map((col, i) => {
                 const widthStyle = col.width ? { width: `${col.width}px`, minWidth: `${col.width}px` } : {};
-                const defaultWidthClass = col.key === 'sr' ? 'w-[100px] text-center' : col.type === 'image' ? 'w-[137px] text-center' : 'min-w-[130px] text-left';
+                const defaultWidthClass = col.key === 'sr' ? 'w-[130px] text-center' : col.type === 'image' ? 'w-[137px] text-center' : 'min-w-[130px] text-left';
                 
                 return (
                   <th 
                     key={col.key} 
-                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}
+                    className={`sticky top-0 z-10 text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] ${!col.width ? defaultWidthClass : (col.key === 'sr' || col.type === 'image' ? 'text-center' : 'text-left')} bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3] ${col.key === 'sr' ? 'sticky left-0 z-[30]' : ''}`}
                     style={widthStyle}
                   >
                     <div className="flex items-center gap-1">
@@ -799,7 +799,6 @@ function AppContent() {
                   </th>
                 );
               })}
-              <th className={`sticky top-0 z-10 text-left text-xs text-[#2f3d49] p-1.5 border-r border-b border-[#e0e0e0] w-[100px] bg-[#f3f3f3] data-[hovered-col=true]:bg-[#fce7f3]`}>Act 🔒</th>
             </tr>
           </thead>
           <Droppable droppableId={`droppable-tbody-${isSecondary ? 'secondary' : 'primary'}`}>
@@ -807,7 +806,7 @@ function AppContent() {
               <tbody ref={provided.innerRef} {...provided.droppableProps}>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={config.columns.length + (!isSecondary && config.rowReorderEnabled ? 2 : (!isSecondary ? 1 : 0))} className="text-center text-[#90a4ae] font-bold p-1.5 border-r border-b border-[#e0e0e0]">
+                    <td colSpan={config.columns.length + (!isSecondary && config.rowReorderEnabled ? 1 : 0)} className="text-center text-[#90a4ae] font-bold p-1.5 border-r border-b border-[#e0e0e0]">
                       {tokens.length > 0 ? 'No rows match your search.' : 'No row data yet.'}
                     </td>
                   </tr>
@@ -857,8 +856,24 @@ function AppContent() {
                             };
 
                             if (col.key === 'sr') {
-                              const srWidthStyle = col.width ? widthStyle : { width: '100px', minWidth: '100px' };
-                              return <td key={col.key} {...commonProps} style={{...commonProps.style, ...srWidthStyle}} className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-[#f3f3f3] data-[hovered-row=true]:bg-[#fce7f3] overflow-hidden`}>{rowIndex + 1}</td>;
+                              const srWidthStyle = col.width ? widthStyle : { width: '130px', minWidth: '130px' };
+                              return (
+                                <td 
+                                  key={col.key} 
+                                  {...commonProps} 
+                                  style={{...commonProps.style, ...srWidthStyle}} 
+                                  className={`font-bold text-center p-1.5 border-r border-b border-[#e0e0e0] bg-white data-[hovered-row=true]:bg-[#fce7f3] overflow-hidden sticky left-0 z-[20]`}
+                                >
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button className="border-0 bg-transparent cursor-pointer text-[15px]" onClick={() => { 
+                                      setEditingRowId(row.id); 
+                                      setEditingPageName(isSecondary ? activeConfig.secondarySearchPage! : state.activePage);
+                                      toggleModal('addRow', true); 
+                                    }}>✏️</button>
+                                    <span>{rowIndex + 1}</span>
+                                  </div>
+                                </td>
+                              );
                             }
                             
                             const rawVal = row[col.key];
@@ -972,15 +987,7 @@ function AppContent() {
                               </td>
                             );
                           })}
-                          <td 
-                            className={`w-[100px] whitespace-nowrap p-1.5 border-r border-b border-[#e0e0e0] overflow-hidden data-[hovered-col=true]:bg-[#f0f7ff] data-[hovered-row=true]:bg-[#e8f0fe] data-[hovered-exact=true]:!bg-[#d2e3fc] data-[hovered-exact=true]:outline data-[hovered-exact=true]:outline-[3px] data-[hovered-exact=true]:outline-[#2b579a] data-[hovered-exact=true]:relative data-[hovered-exact=true]:z-10 data-[hovered-exact=true]:shadow-inner`}
-                          >
-                            <button className="border-0 bg-transparent cursor-pointer text-[15px] mr-1" onClick={() => { 
-                              setEditingRowId(row.id); 
-                              setEditingPageName(isSecondary ? activeConfig.secondarySearchPage! : state.activePage);
-                              toggleModal('addRow', true); 
-                            }}>✏️</button>
-                          </td>
+                          {/* Act column removed */}
                         </tr>
                       )}
                     </Draggable>
