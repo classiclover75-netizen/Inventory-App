@@ -68,6 +68,7 @@ export interface GlobalCopyBoxesSettings {
   box3Label?: string;
   separator: string;
   order: ('box1' | 'box2' | 'box3')[];
+  isEnabled?: boolean;
 }
 
 export interface AppState {
