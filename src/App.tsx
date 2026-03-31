@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, Plus, X, Edit, Trash2, Copy, Image as ImageIcon, RefreshCw, GripVertical, ArrowUp, ArrowDown, Lock, Unlock } from 'lucide-react';
+import { Settings, Plus, X, Edit, Trash2, Copy, Image as ImageIcon, RefreshCw, GripVertical, ArrowUp, ArrowDown, Lock, Unlock, Palette, ChevronUp, ChevronDown } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Button, Input, Modal } from './components/ui';
 import { ToastProvider, useToast } from './components/ToastProvider';
@@ -132,6 +132,19 @@ function AppContent() {
   const [primarySearchInput, setPrimarySearchInput] = useState('');
   const [secondarySearchInput, setSecondarySearchInput] = useState('');
 
+  const [isFormattingBarMinimized, setIsFormattingBarMinimized] = useState(false);
+  const [formattingColor, setFormattingColor] = useState('');
+  const [activeCell, setActiveCell] = useState<{ rowId: string, colKey: string } | null>(null);
+
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, rowId: string, colKey: string} | null>(null);
+  const [colorModal, setColorModal] = useState<{rowId: string, colKey?: string, type: 'row'|'cell', initialColor: string} | null>(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
   useEffect(() => {
     setPrimarySearchInput(pageSearchQueries[state.activePage] || '');
   }, [state.activePage]);
@@ -199,6 +212,80 @@ function AppContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showUndoToast, lastSearchQuery, lastSecondarySearchQuery, primarySearchInput, secondarySearchInput, state.activePage]);
+
+  const handleSetColor = (rowId: string, type: 'row' | 'cell', color: string, colKey?: string) => {
+    setState(prev => {
+      const pageRows = prev.pageRows[prev.activePage] || [];
+      const newRows = pageRows.map(r => {
+        if (r.id === rowId) {
+          const newRow = { ...r };
+          if (type === 'row') {
+            newRow._rowColor = color;
+          } else if (type === 'cell' && colKey) {
+            newRow._cellColors = { ...(newRow._cellColors || {}), [colKey]: color };
+          }
+          return newRow;
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        pageRows: {
+          ...prev.pageRows,
+          [prev.activePage]: newRows
+        }
+      };
+    });
+    setColorModal(null);
+  };
+
+  const handleApplyFormatting = (type: 'row' | 'cell' | 'text') => {
+    if (type === 'row') {
+      if (selectedRowIds.size > 0) {
+        selectedRowIds.forEach(id => handleSetColor(id, 'row', formattingColor));
+      } else if (activeCell) {
+        handleSetColor(activeCell.rowId, 'row', formattingColor);
+      }
+    } else if (type === 'cell') {
+      if (activeCell) {
+        handleSetColor(activeCell.rowId, 'cell', formattingColor, activeCell.colKey);
+      }
+    } else if (type === 'text') {
+      document.execCommand('styleWithCSS', false, 'true');
+      document.execCommand('foreColor', false, formattingColor);
+      // After applying text color, we should trigger an input event to save
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        let container = selection.getRangeAt(0).commonAncestorContainer as any;
+        while (container && !container.contentEditable && container.parentElement) {
+          container = container.parentElement;
+        }
+        if (container && container.contentEditable === 'true') {
+          const event = new Event('input', { bubbles: true });
+          container.dispatchEvent(event);
+        }
+      }
+    }
+  };
+
+  const handleCellContentChange = (rowId: string, colKey: string, newHtml: string) => {
+    setState(prev => {
+      const pageRows = prev.pageRows[prev.activePage] || [];
+      const newRows = pageRows.map(r => {
+        if (r.id === rowId) {
+          return { ...r, [colKey]: newHtml };
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        pageRows: {
+          ...prev.pageRows,
+          [prev.activePage]: newRows
+        }
+      };
+    });
+  };
 
   const handleExportData = () => {
     try {
@@ -737,15 +824,37 @@ function AppContent() {
     return sortRows(rows, secConfig.columns);
   }, [state.pageRows, state.pageConfigs, activeConfig.secondarySearchPage, secondarySearchQuery]);
 
-  const highlightText = (txt: any, tokens: string[]) => {
-    if (!tokens.length || !txt) return String(txt || '');
+  const highlightTextHtml = (txt: any, tokens: string[]) => {
+    if (!txt) return { __html: '' };
     const safe = String(txt);
+    
+    if (!tokens.length) {
+      return { __html: safe };
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(safe, 'text/html');
+    
     const escaped = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const regex = new RegExp('(' + escaped.join('|') + ')', 'gi');
-    const parts = safe.split(regex);
-    return parts.map((part, i) => 
-      regex.test(part) ? <span key={i} className="bg-yellow-300 text-black font-bold rounded-sm px-[1px]">{part}</span> : part
-    );
+
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        if (regex.test(text)) {
+          const span = document.createElement('span');
+          span.innerHTML = text.replace(regex, '<mark class="bg-yellow-300 text-black font-bold rounded-sm px-[1px]">$1</mark>');
+          node.parentNode?.replaceChild(span, node);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if ((node as HTMLElement).tagName !== 'MARK') {
+          Array.from(node.childNodes).forEach(walk);
+        }
+      }
+    };
+
+    Array.from(doc.body.childNodes).forEach(walk);
+    return { __html: doc.body.innerHTML };
   };
 
   const searchTokens = currentSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -852,7 +961,19 @@ function AppContent() {
                             const hoverClass = 'data-[hovered-col=true]:bg-[#f0f7ff] data-[hovered-row=true]:bg-[#e8f0fe] data-[hovered-exact=true]:!bg-[#d2e3fc] data-[hovered-exact=true]:outline data-[hovered-exact=true]:outline-[3px] data-[hovered-exact=true]:outline-[#2b579a] data-[hovered-exact=true]:relative data-[hovered-exact=true]:z-10 data-[hovered-exact=true]:shadow-inner';
                             
                             const commonProps = {
-                              style: widthStyle
+                              style: {
+                                ...widthStyle,
+                                backgroundColor: row._cellColors?.[col.key] || row._rowColor || undefined,
+                                outline: activeCell?.rowId === row.id && activeCell?.colKey === col.key ? '2px solid #2b579a' : undefined,
+                                outlineOffset: '-2px'
+                              },
+                              onContextMenu: (e: React.MouseEvent) => {
+                                e.preventDefault();
+                                setContextMenu({ x: e.clientX, y: e.clientY, rowId: row.id, colKey: col.key });
+                              },
+                              onClick: () => {
+                                setActiveCell({ rowId: row.id, colKey: col.key });
+                              }
                             };
 
                             if (col.key === 'sr') {
@@ -929,7 +1050,7 @@ function AppContent() {
                                         const itemId = `${row.id}-${col.key}-${i}`;
                                         return (
                                           <div key={i} className="flex items-center justify-between gap-1.5 border border-[#d7e3f6] bg-[#f9fcff] rounded px-1.5 py-0.5 min-h-[25px]">
-                                            <span>{highlightText(item, tokens)}</span>
+                                            <span dangerouslySetInnerHTML={highlightTextHtml(item, tokens)} />
                                             <button 
                                               className="border-0 rounded bg-[#2b579a] text-white px-1.5 py-0.5 text-[11px] font-bold cursor-pointer shrink-0"
                                               onClick={(e) => {
@@ -969,19 +1090,38 @@ function AppContent() {
                               );
                             }
 
-                            if (Array.isArray(rawVal)) {
-                              return (
-                                <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
-                                  {rawVal.map((v, i) => <React.Fragment key={i}>{highlightText(v, tokens)}<br/></React.Fragment>)}
-                                </td>
-                              );
-                            }
-
-                            return (
-                              <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
-                                {highlightText(rawVal, tokens)}
-                              </td>
-                            );
+                             if (Array.isArray(rawVal)) {
+                               return (
+                                 <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
+                                   {rawVal.map((v, i) => (
+                                     <React.Fragment key={i}>
+                                       <span 
+                                         contentEditable 
+                                         suppressContentEditableWarning
+                                         onBlur={(e) => {
+                                           const newArray = [...rawVal];
+                                           newArray[i] = e.currentTarget.innerHTML;
+                                           handleCellContentChange(row.id, col.key, newArray as any);
+                                         }}
+                                         dangerouslySetInnerHTML={highlightTextHtml(v, tokens)} 
+                                       />
+                                       <br/>
+                                     </React.Fragment>
+                                   ))}
+                                 </td>
+                               );
+                             }
+ 
+                             return (
+                               <td key={col.key} {...commonProps} className={`p-1.5 border-r border-b border-[#e0e0e0] ${hoverClass} overflow-hidden text-[14px] font-['Arial'] font-normal`}>
+                                 <span 
+                                   contentEditable 
+                                   suppressContentEditableWarning
+                                   onBlur={(e) => handleCellContentChange(row.id, col.key, e.currentTarget.innerHTML)}
+                                   dangerouslySetInnerHTML={highlightTextHtml(rawVal, tokens)} 
+                                 />
+                               </td>
+                             );
                           })}
                         </tr>
                       )}
@@ -1229,6 +1369,88 @@ function AppContent() {
           }
           return null;
         })}
+      </div>
+
+      {/* Formatting Toolbar */}
+      <div className="bg-white border border-[#d8d8d8] rounded-md p-1 flex flex-col overflow-hidden transition-all duration-300">
+        <div className="flex items-center justify-between px-2 py-0.5 border-b border-gray-100 mb-1">
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+            <Palette size={12} /> Formatting Toolbar
+          </div>
+          <button 
+            onClick={() => setIsFormattingBarMinimized(!isFormattingBarMinimized)}
+            className="p-0.5 hover:bg-gray-100 rounded text-gray-400"
+          >
+            {isFormattingBarMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
+        </div>
+        
+        {!isFormattingBarMinimized && (
+          <div className="flex items-center gap-3 px-2 py-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-gray-600">Color:</span>
+              <input 
+                type="text" 
+                className="border border-gray-300 rounded px-2 py-1 text-xs w-32 h-7 focus:border-blue-500 focus:outline-none"
+                placeholder="#HEX, rgb(), hsl()"
+                value={formattingColor}
+                onChange={e => setFormattingColor(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex items-center gap-1 border-l border-gray-200 pl-3">
+              <Button 
+                variant="secondary" 
+                className="h-7 px-2 text-[11px] font-bold flex items-center gap-1"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleApplyFormatting('row')}
+                title="Apply color to selected rows or active row"
+              >
+                Apply to Row
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="h-7 px-2 text-[11px] font-bold flex items-center gap-1"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleApplyFormatting('cell')}
+                title="Apply color to active cell"
+              >
+                Apply to Cell
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="h-7 px-2 text-[11px] font-bold flex items-center gap-1"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleApplyFormatting('text')}
+                title="Apply color to selected text"
+              >
+                Apply to Text
+              </Button>
+              <div className="w-px h-4 bg-gray-200 mx-1" />
+              <Button 
+                variant="secondary" 
+                className="h-7 px-2 text-[11px] font-bold text-red-600 border-red-100 hover:bg-red-50"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (selectedRowIds.size > 0) {
+                    selectedRowIds.forEach(id => handleSetColor(id, 'row', ''));
+                  } else if (activeCell) {
+                    handleSetColor(activeCell.rowId, 'row', '');
+                    handleSetColor(activeCell.rowId, 'cell', '', activeCell.colKey);
+                  }
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+            
+            {activeCell && (
+              <div className="ml-auto text-[10px] text-gray-400 font-medium italic">
+                Active: Row {state.pageRows[state.activePage]?.findIndex(r => r.id === activeCell.rowId) + 1}, Col {activeCell.colKey}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-[260px] overflow-auto border border-gray-400 rounded-md bg-white flex flex-col">
@@ -1526,6 +1748,95 @@ function AppContent() {
           />
         </div>,
         document.body
+      )}
+
+      {contextMenu && (
+        <div
+          className="fixed bg-white border border-gray-200 shadow-xl rounded py-1 z-50 text-[13px] w-40"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 hover:bg-gray-100"
+            onClick={() => {
+              const row = state.pageRows[state.activePage]?.find(r => r.id === contextMenu.rowId);
+              setColorModal({
+                rowId: contextMenu.rowId,
+                type: 'row',
+                initialColor: row?._rowColor || ''
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set Row Color
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 hover:bg-gray-100"
+            onClick={() => {
+              const row = state.pageRows[state.activePage]?.find(r => r.id === contextMenu.rowId);
+              setColorModal({
+                rowId: contextMenu.rowId,
+                colKey: contextMenu.colKey,
+                type: 'cell',
+                initialColor: row?._cellColors?.[contextMenu.colKey] || ''
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set Cell Color
+          </button>
+          <div className="h-px bg-gray-200 my-1" />
+          <button
+            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
+            onClick={() => {
+              handleSetColor(contextMenu.rowId, 'row', '');
+              if (contextMenu.colKey) {
+                handleSetColor(contextMenu.rowId, 'cell', '', contextMenu.colKey);
+              }
+              setContextMenu(null);
+            }}
+          >
+            Clear Colors
+          </button>
+        </div>
+      )}
+
+      {colorModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-lg p-4 w-80 shadow-xl">
+            <h3 className="text-lg font-bold mb-4">
+              Set {colorModal.type === 'row' ? 'Row' : 'Cell'} Color
+            </h3>
+            <div className="mb-4">
+              <label className="block text-[13px] font-medium text-gray-700 mb-1">Color Code (HEX, RGB, HSL)</label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded p-2 text-[13px]"
+                placeholder="e.g. #ff0000, rgb(255,0,0)"
+                defaultValue={colorModal.initialColor}
+                id="colorInput"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (document.getElementById('colorInput') as HTMLInputElement).value;
+                    handleSetColor(colorModal.rowId, colorModal.type, val, colorModal.colKey);
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setColorModal(null)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                const val = (document.getElementById('colorInput') as HTMLInputElement).value;
+                handleSetColor(colorModal.rowId, colorModal.type, val, colorModal.colKey);
+              }}>
+                Apply
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

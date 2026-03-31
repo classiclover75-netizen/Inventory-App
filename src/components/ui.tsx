@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 import { X, ArrowLeft } from 'lucide-react';
 
-export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'dark' | 'blue' | 'green' | 'red' | 'orange' | 'outline' }>(
+export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'dark' | 'blue' | 'green' | 'red' | 'orange' | 'outline' | 'secondary' }>(
   ({ className, variant = 'dark', ...props }, ref) => {
     const variants = {
       dark: 'bg-gray-800 text-white hover:bg-gray-700',
@@ -11,6 +11,7 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
       red: 'bg-[#b71c1c] text-white hover:bg-red-800',
       orange: 'bg-[#e65100] text-white hover:bg-orange-800',
       outline: 'border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200',
+      secondary: 'bg-[#f3f4f6] text-[#37474f] border border-[#cfd8dc] hover:bg-[#e2e8f0]',
     };
     return (
       <button

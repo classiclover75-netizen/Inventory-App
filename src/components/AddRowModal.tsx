@@ -329,16 +329,31 @@ export const AddRowModal = ({
                     ) : col.type === 'text_with_copy_button' ? (
                       <div className="flex flex-col gap-1">
                         {(Array.isArray(block[col.key]) && block[col.key].length > 0 ? block[col.key] : ['']).map((val: string, idx: number) => (
-                          <Input 
-                            key={idx} 
-                            value={val} 
-                            placeholder={`Item ${idx + 1}`}
-                            onChange={e => {
-                              const newArr = [...(Array.isArray(block[col.key]) ? block[col.key] : [''])];
-                              newArr[idx] = e.target.value;
-                              handleUpdateField(i, col.key, newArr);
-                            }}
-                          />
+                          <div key={idx} className="flex gap-1 items-center">
+                            <Input 
+                              value={val} 
+                              placeholder={`Item ${idx + 1}`}
+                              onChange={e => {
+                                const newArr = [...(Array.isArray(block[col.key]) ? block[col.key] : [''])];
+                                newArr[idx] = e.target.value;
+                                handleUpdateField(i, col.key, newArr);
+                              }}
+                            />
+                            {(Array.isArray(block[col.key]) ? block[col.key] : ['']).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newArr = [...(Array.isArray(block[col.key]) ? block[col.key] : [''])];
+                                  newArr.splice(idx, 1);
+                                  handleUpdateField(i, col.key, newArr);
+                                }}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors border-0 bg-transparent cursor-pointer"
+                                title="Remove this box"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </div>
                         ))}
                         <button 
                           type="button" 

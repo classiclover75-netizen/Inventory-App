@@ -33,23 +33,35 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
 
   const exportColumns = useMemo(() => columns.filter(c => c.key !== 'sr'), [columns]);
 
-  const highlightText = (text: string, query: string) => {
-    if (!query || !text) return text;
+  const highlightTextHtml = (text: string, query: string) => {
+    if (!query || !text) return { __html: String(text || '') };
     const strText = String(text);
     const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return strText;
+    if (tokens.length === 0) return { __html: strText };
 
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(strText, 'text/html');
+    
     const escapedTokens = tokens.map(t => t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'));
     const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
 
-    const parts = strText.split(regex);
-    return parts.map((part, i) => 
-      tokens.some(t => t === part.toLowerCase()) ? (
-        <span key={i} className="bg-yellow-300 text-black font-bold px-0.5 rounded-sm">{part}</span>
-      ) : (
-        part
-      )
-    );
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = node.textContent || '';
+        if (regex.test(txt)) {
+          const span = document.createElement('span');
+          span.innerHTML = txt.replace(regex, '<mark class="bg-yellow-300 text-black font-bold px-0.5 rounded-sm">$1</mark>');
+          node.parentNode?.replaceChild(span, node);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if ((node as HTMLElement).tagName !== 'MARK') {
+          Array.from(node.childNodes).forEach(walk);
+        }
+      }
+    };
+
+    Array.from(doc.body.childNodes).forEach(walk);
+    return { __html: doc.body.innerHTML };
   };
 
   // Code 2 wala Advanced Tokenized Search
@@ -61,6 +73,84 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
       return tokens.every(t => blob.includes(t));
     });
   }, [localRows, deferredSearchQuery]);
+
+  const htmlToRichText = (html: string) => {
+    if (!html || !html.includes('<')) return html;
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const richText: any[] = [];
+
+    const walk = (node: Node, currentFont: any) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node.textContent) {
+          richText.push({ text: node.textContent, font: { ...currentFont } });
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (el.tagName === 'BR') {
+          richText.push({ text: '\n', font: { ...currentFont } });
+          return;
+        }
+        
+        const newFont = { ...currentFont };
+        if (el.style.color) {
+          let color = el.style.color;
+          if (color.startsWith('rgb')) {
+            const rgb = color.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+              color = ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1).toUpperCase();
+            }
+          } else if (color.startsWith('#')) {
+            color = color.substring(1).toUpperCase();
+          }
+          if (color.length === 6) color = 'FF' + color;
+          newFont.color = { argb: color };
+        }
+        if (el.tagName === 'B' || el.tagName === 'STRONG' || el.style.fontWeight === 'bold' || el.style.fontWeight >= '700') newFont.bold = true;
+        if (el.tagName === 'I' || el.tagName === 'EM' || el.style.fontStyle === 'italic') newFont.italic = true;
+        if (el.tagName === 'U' || el.style.textDecoration === 'underline') newFont.underline = true;
+
+        Array.from(node.childNodes).forEach(child => walk(child, newFont));
+        
+        if (['P', 'DIV', 'LI', 'TR'].includes(el.tagName)) {
+          richText.push({ text: '\n', font: { ...currentFont } });
+        }
+      }
+    };
+
+    Array.from(doc.body.childNodes).forEach(child => walk(child, {}));
+    
+    while (richText.length > 0 && richText[richText.length - 1].text === '\n') {
+      richText.pop();
+    }
+
+    return richText.length > 0 ? { richText } : html;
+  };
+
+  const toARGB = (color: string) => {
+    if (!color) return undefined;
+    let c = color.trim();
+    if (c.startsWith('#')) {
+      c = c.substring(1).toUpperCase();
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      if (c.length === 6) return 'FF' + c;
+      if (c.length === 8) return c;
+    }
+    const el = document.createElement('div');
+    el.style.color = c;
+    document.body.appendChild(el);
+    const computed = window.getComputedStyle(el).color;
+    document.body.removeChild(el);
+    const match = computed.match(/\d+/g);
+    if (match && match.length >= 3) {
+      const r = parseInt(match[0]).toString(16).padStart(2, '0');
+      const g = parseInt(match[1]).toString(16).padStart(2, '0');
+      const b = parseInt(match[2]).toString(16).padStart(2, '0');
+      return 'FF' + (r + g + b).toUpperCase();
+    }
+    return undefined;
+  };
 
   const handleExport = async () => {
     setIsProcessing(true);
@@ -107,11 +197,46 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
         const rowValues: any = {};
         
         exportColumns.forEach(col => {
-          if (col.type === 'image') rowValues[col.key] = ''; // Text clear karein
-          else rowValues[col.key] = rowData[col.key] || '';
+          if (col.type === 'image') {
+            rowValues[col.key] = ''; // Text clear karein
+          } else {
+            const val = rowData[col.key];
+            if (Array.isArray(val)) {
+              const joined = val.join('\n');
+              rowValues[col.key] = joined.includes('<') ? htmlToRichText(joined) : joined;
+            } else if (typeof val === 'string' && val.includes('<')) {
+              rowValues[col.key] = htmlToRichText(val);
+            } else {
+              rowValues[col.key] = val || '';
+            }
+          }
         });
         
         const excelRow = worksheet.addRow(rowValues);
+        
+        // Apply row color
+        if (rowData._rowColor) {
+          const argb = toARGB(rowData._rowColor);
+          if (argb) {
+            excelRow.eachCell(cell => {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
+            });
+          }
+        }
+
+        // Apply cell colors
+        if (rowData._cellColors) {
+          exportColumns.forEach((col, idx) => {
+            const cellColor = rowData._cellColors[col.key];
+            if (cellColor) {
+              const argb = toARGB(cellColor);
+              if (argb) {
+                const cell = excelRow.getCell(idx + 1);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
+              }
+            }
+          });
+        }
         
         // Image kay liye row height badi ki (First code requirement)
         excelRow.height = 80; 
@@ -231,7 +356,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                         <td key={c.key} className="p-2 border whitespace-normal break-words min-w-[150px] text-[14px] font-['Arial'] font-normal">
                           {c.type === 'image' && row[c.key] ? 
                             <img src={String(row[c.key])} className="h-10 w-10 object-contain mx-auto rounded" alt="img" /> 
-                            : highlightText(String(row[c.key] || ''), deferredSearchQuery)
+                            : <span dangerouslySetInnerHTML={highlightTextHtml(String(row[c.key] || ''), deferredSearchQuery)} />
                           }
                         </td>
                       ))}

@@ -103,7 +103,35 @@ export const ExcelImportModal = ({ isOpen, onClose, onBack, onImport, existingCo
         
         extractedHeaders.forEach((h, i) => {
           const cell = row.getCell(i + 1);
-          const cellValue = cell.value?.toString() || '';
+          let cellValue = '';
+          
+          if (cell.value && typeof cell.value === 'object' && 'richText' in cell.value) {
+            // Convert rich text back to HTML
+            const richTextArr = (cell.value as any).richText;
+            cellValue = richTextArr.map((rt: any) => {
+              let text = rt.text || '';
+              if (!rt.font) return text;
+              
+              let styleStr = '';
+              if (rt.font.color && rt.font.color.argb) {
+                let color = rt.font.color.argb;
+                if (color.length === 8) color = '#' + color.substring(2);
+                else color = '#' + color;
+                styleStr += `color: ${color};`;
+              }
+              if (rt.font.bold) styleStr += `font-weight: bold;`;
+              if (rt.font.italic) styleStr += `font-style: italic;`;
+              if (rt.font.underline) styleStr += `text-decoration: underline;`;
+              
+              if (styleStr) return `<span style="${styleStr}">${text}</span>`;
+              return text;
+            }).join('');
+          } else if (cell.value && typeof cell.value === 'object' && 'result' in cell.value) {
+            cellValue = (cell.value as any).result?.toString() || '';
+          } else {
+            cellValue = cell.value?.toString() || '';
+          }
+          
           const trimmedValue = cellValue.trim();
           
           if (cellValue !== trimmedValue) {
@@ -185,23 +213,35 @@ export const ExcelImportModal = ({ isOpen, onClose, onBack, onImport, existingCo
     window.URL.revokeObjectURL(url);
   };
 
-  const highlightText = (text: string, query: string) => {
-    if (!query || !text) return text;
+  const highlightTextHtml = (text: string, query: string) => {
+    if (!query || !text) return { __html: String(text || '') };
     const strText = String(text);
     const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return strText;
+    if (tokens.length === 0) return { __html: strText };
 
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(strText, 'text/html');
+    
     const escapedTokens = tokens.map(t => t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'));
     const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
 
-    const parts = strText.split(regex);
-    return parts.map((part, i) => 
-      tokens.some(t => t === part.toLowerCase()) ? (
-        <span key={i} className="bg-yellow-300 text-black font-bold px-0.5 rounded-sm">{part}</span>
-      ) : (
-        part
-      )
-    );
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = node.textContent || '';
+        if (regex.test(txt)) {
+          const span = document.createElement('span');
+          span.innerHTML = txt.replace(regex, '<mark class="bg-yellow-300 text-black font-bold px-0.5 rounded-sm">$1</mark>');
+          node.parentNode?.replaceChild(span, node);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if ((node as HTMLElement).tagName !== 'MARK') {
+          Array.from(node.childNodes).forEach(walk);
+        }
+      }
+    };
+
+    Array.from(doc.body.childNodes).forEach(walk);
+    return { __html: doc.body.innerHTML };
   };
 
   const finalRows = useMemo(() => {
@@ -429,7 +469,7 @@ export const ExcelImportModal = ({ isOpen, onClose, onBack, onImport, existingCo
                       <td key={h} className="p-2 border whitespace-normal break-words min-w-[150px] text-[14px] font-['Arial'] font-normal">
                         {String(row[h]).startsWith('data:image') ? 
                           <img src={row[h]} className="h-10 w-10 object-contain mx-auto rounded shadow-sm" alt="excel-img" /> 
-                          : highlightText(String(row[h] || ''), deferredSearchQuery)}
+                          : <span dangerouslySetInnerHTML={highlightTextHtml(String(row[h] || ''), deferredSearchQuery)} />}
                       </td>
                     ))}
                   </tr>
